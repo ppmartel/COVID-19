@@ -1,4 +1,7 @@
 from datetime import timedelta, date, datetime
+import cartopy.crs as ccrs
+import cartopy.io.shapereader as shpreader
+from matplotlib import cm
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -166,3 +169,40 @@ df_rki_de.to_csv('COVID-19_RKI_DE.csv', index = False, encoding='utf-8')
 df_rki_de.set_index('Date', inplace=True)
 df_rki_de.groupby(['State'])['Cases'].plot(figsize=(15,7),legend=True)
 plt.savefig("COVID-19_RKI_DE.png")
+
+plt.clf()
+
+##################################################
+# Plot map of Germany
+##################################################
+
+end_dt = end_dt.strftime("%Y-%m-%d")
+
+reds = cm.get_cmap('Reds', 8)
+
+fig = plt.figure()
+ax = fig.add_axes([0, 0, 1, 1], projection=ccrs.EuroPP())
+ax.set_extent([200000, 1000000, 5200000, 6200000], crs=ccrs.EuroPP())
+
+# to get the effect of having just the states without a map "background"
+# turn off the outline and background patches
+ax.background_patch.set_visible(False)
+ax.outline_patch.set_visible(False)
+
+de_reader = shpreader.Reader('GADM/gadm36_DEU_1.shp')
+de_states = list(de_reader.records())
+
+cases_max = max(df_rki_de.loc[:,'Cases'])
+print("Max = "+str(cases_max))
+colors = []
+de_shapes = []
+for n in range(len(de_states)):
+    cases_state = df_rki_de[df_rki_de['State'] == de_states[n].attributes['NAME_1']].loc[end_dt,'Cases']
+    print(str(n)+" - "+de_states[n].attributes['NAME_1']+" = "+str(cases_state))
+    colors.append(reds(cases_state/cases_max))
+    de_shapes.append(de_states[n].geometry)
+    ax.add_geometries([de_states[n].geometry], ccrs.PlateCarree(), facecolor=reds(cases_state/cases_max), edgecolor='black')
+
+ax.set_title('My First Map')
+
+plt.savefig("MAP_DE.png")
