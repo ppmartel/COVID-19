@@ -21,8 +21,8 @@ print(de_states[0].attributes['GID_1']+" - "+de_states[0].attributes['NAME_1'])
 
 # to get the effect of having just the states without a map "background"
 # turn off the outline and background patches
-#ax.background_patch.set_visible(False)
-#ax.outline_patch.set_visible(False)
+ax.background_patch.set_visible(False)
+ax.outline_patch.set_visible(False)
 
 ax.set_title('My First Map')
 
