@@ -11,6 +11,16 @@ import requests
 import tabula
 
 ##################################################
+# Bundesland populations
+##################################################
+
+de_pop = {'State' : ['Baden-Württemberg','Bayern','Berlin','Brandenburg','Bremen','Hamburg','Hessen','Mecklenburg-Vorpommern','Niedersachsen','Nordrhein-Westfalen','Rheinland-Pfalz','Saarland','Sachsen','Sachsen-Anhalt','Schleswig-Holstein','Thüringen'],
+          'Population' : [10.755,12.542,3.469,2.5,0.661,1.788,6.066,1.639,7.914,17.837,4.053,1.018,4.143,2.331,2.833,2.231]
+}
+df_de_pop = pd.DataFrame(de_pop, columns = ['State','Population'])
+df_de_pop.set_index('State', inplace=True)
+
+##################################################
 # Check whether the data already exists on disk
 ##################################################
 
@@ -23,7 +33,7 @@ if os.path.exists('COVID-19_RKI_WW.csv'):
     df_rki_ww_all = [df_rki_ww_old]
     df_rki_de_all = [df_rki_de_old]
 
-    start_dt = datetime.strptime(df_rki_ww_old['Date'].max(),'%Y-%m-%d') + timedelta(1)
+    start_dt = datetime.strptime(df_rki_de_old['Date'].max(),'%Y-%m-%d') + timedelta(1)
 else:
     print("Databases do not exist - Building them")
 
@@ -97,31 +107,46 @@ for dt in range(int ((end_dt - start_dt).days)+1):
     # Get World statistics
     ##################################################
 
-    tab_rki_ww = tabula.read_pdf(file, pages="1", silent=True, pandas_options={'header': None})
-
-    #tabula.read_pdf("RKI/2020-03-10-de.pdf", pages="1", stream=True, guess=False)
-    if len(tab_rki_ww) > 0:
-        df_rki_ww_new = tab_rki_ww[0]
-        
-        if len(df_rki_ww_new.columns) > 4:
-            df_rki_ww_new.drop(df_rki_ww_new.columns[0], axis=1, inplace=True)
-        
-        df_rki_ww_new.drop(df_rki_ww_new.columns[3], axis=1, inplace=True)
-        df_rki_ww_new.rename(columns = {df_rki_ww_new.columns[0]:'Region',df_rki_ww_new.columns[1]:'Cases',df_rki_ww_new.columns[2]:'Deaths'}, inplace=True)
-        df_rki_ww_new.dropna(inplace = True)
-        df_rki_ww_new.replace(to_replace = 'Europa (einschl. D)', value = 'Europa', inplace = True)
-        df_rki_ww_new.replace(to_replace = '.', value = '', inplace = True)
-        df_rki_ww_new.reset_index(drop = True, inplace = True)
-
-        df_rki_ww_new['Cases'] = df_rki_ww_new['Cases'].astype(str)
-        df_rki_ww_new['Cases'] = [x.replace('.','') for x in df_rki_ww_new['Cases']]
-        df_rki_ww_new['Cases'] = df_rki_ww_new['Cases'].astype(int)
-        df_rki_ww_new['Deaths'] = df_rki_ww_new['Deaths'].astype(str)
-        df_rki_ww_new['Deaths'] = [x.replace('.','') for x in df_rki_ww_new['Deaths']]
-        df_rki_ww_new['Deaths'] = df_rki_ww_new['Deaths'].astype(int)
-        df_rki_ww_new.insert(0, column='Date', value=new_date)
-
-        df_rki_ww_all.append(df_rki_ww_new)
+    #tab_rki_ww = tabula.read_pdf(file, pages="1", silent=True, pandas_options={'header': None})
+    #
+    #if len(tab_rki_ww) > 0:
+    #    df_rki_ww_new = tab_rki_ww[0]
+    #    print(df_rki_ww_new)
+    #    if len(df_rki_ww_new.columns) < 2:
+    #        tab_rki_ww = tabula.read_pdf(file, pages="1", stream=True, guess=False, silent=True, pandas_options={'header': None})
+    #        if len(tab_rki_ww) > 0:
+    #            df_rki_ww_new = tab_rki_ww[0]
+    #            if len(df_rki_ww_new.columns) > 2:
+    #                cols = list(i for i in range(2,len(df_rki_ww_new.columns),1))
+    #                df_rki_ww_new.drop(df_rki_ww_new.columns[cols], axis=1, inplace=True)
+    #            df_rki_ww_new.dropna(inplace = True)
+    #            if len(df_rki_ww_new.columns) > 1:
+    #                df_rki_ww_new.drop(df_rki_ww_new.columns[1], axis=1, inplace=True)
+    #            df_rki_ww_new = df_rki_ww_new[df_rki_ww_new.columns[0]].str.rsplit(' ', 2, expand = True)
+    #            df_rki_ww_new = df_rki_ww_new[pd.to_numeric(df_rki_ww_new[df_rki_ww_new.columns[1]], errors='coerce').notnull()]
+    #        else:
+    #            continue
+    #
+    #    if len(df_rki_ww_new.columns) > 4:
+    #        df_rki_ww_new.drop(df_rki_ww_new.columns[0], axis=1, inplace=True)
+    #    
+    #    if len(df_rki_ww_new.columns) > 3:
+    #        df_rki_ww_new.drop(df_rki_ww_new.columns[3], axis=1, inplace=True)
+    #    
+    #    df_rki_ww_new.rename(columns = {df_rki_ww_new.columns[0]:'Region',df_rki_ww_new.columns[1]:'Cases',df_rki_ww_new.columns[2]:'Deaths'}, inplace=True)
+    #    df_rki_ww_new.dropna(inplace = True)
+    #    df_rki_ww_new.replace(to_replace = 'Europa (einschl. D)', value = 'Europa', inplace = True)
+    #    df_rki_ww_new.reset_index(drop = True, inplace = True)
+    #
+    #    df_rki_ww_new['Cases'] = df_rki_ww_new['Cases'].astype(str)
+    #    df_rki_ww_new['Cases'] = [x.replace('.','') for x in df_rki_ww_new['Cases']]
+    #    df_rki_ww_new['Cases'] = df_rki_ww_new['Cases'].astype(int)
+    #    df_rki_ww_new['Deaths'] = df_rki_ww_new['Deaths'].astype(str)
+    #    df_rki_ww_new['Deaths'] = [x.replace('.','') for x in df_rki_ww_new['Deaths']]
+    #    df_rki_ww_new['Deaths'] = df_rki_ww_new['Deaths'].astype(int)
+    #    df_rki_ww_new.insert(0, column='Date', value=new_date)
+    #
+    #    df_rki_ww_all.append(df_rki_ww_new)
 
     ##################################################
     # Get Germany statistics
@@ -156,13 +181,13 @@ for dt in range(int ((end_dt - start_dt).days)+1):
 # Save and plot data
 ##################################################
 
-df_rki_ww = pd.concat(df_rki_ww_all)
-df_rki_ww.to_csv('COVID-19_RKI_WW.csv', index = False, encoding='utf-8')
-df_rki_ww.set_index('Date', inplace=True)
-df_rki_ww.groupby('Region')['Cases'].plot(figsize=(15,7),legend=True)
-plt.savefig("COVID-19_RKI_WW.png")
-
-plt.clf()
+#df_rki_ww = pd.concat(df_rki_ww_all)
+#df_rki_ww.to_csv('COVID-19_RKI_WW.csv', index = False, encoding='utf-8')
+#df_rki_ww.set_index('Date', inplace=True)
+#df_rki_ww.groupby('Region')['Cases'].plot(figsize=(15,7),legend=True)
+#plt.savefig("COVID-19_RKI_WW.png")
+#
+#plt.clf()
 
 df_rki_de = pd.concat(df_rki_de_all)
 df_rki_de.to_csv('COVID-19_RKI_DE.csv', index = False, encoding='utf-8')
@@ -198,10 +223,11 @@ colors = []
 de_shapes = []
 for n in range(len(de_states)):
     cases_state = df_rki_de[df_rki_de['State'] == de_states[n].attributes['NAME_1']].loc[end_dt,'Cases']
-    print(str(n)+" - "+de_states[n].attributes['NAME_1']+" = "+str(cases_state))
-    colors.append(reds(cases_state/cases_max))
+    pop_state = df_de_pop.loc[de_states[n].attributes['NAME_1'],'Population']
+    print("{0} - {1} = {2:.2f} per million".format(n, de_states[n].attributes['NAME_1'], cases_state/pop_state))
+    colors.append(reds(3000*cases_state/pop_state))
     de_shapes.append(de_states[n].geometry)
-    ax.add_geometries([de_states[n].geometry], ccrs.PlateCarree(), facecolor=reds(cases_state/cases_max), edgecolor='black')
+    ax.add_geometries([de_states[n].geometry], ccrs.PlateCarree(), facecolor=colors[n], edgecolor='black')
 
 ax.set_title('My First Map')
 
