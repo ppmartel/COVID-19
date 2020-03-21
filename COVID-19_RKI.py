@@ -225,7 +225,7 @@ for n in range(len(de_states)):
     cases_state = df_rki_de[df_rki_de['State'] == de_states[n].attributes['NAME_1']].loc[end_dt,'Cases']
     pop_state = df_de_pop.loc[de_states[n].attributes['NAME_1'],'Population']
     print("{0} - {1} = {2:.2f} per million".format(n, de_states[n].attributes['NAME_1'], cases_state/pop_state))
-    colors.append(reds(3000*cases_state/pop_state))
+    colors.append(reds(0.003*cases_state/pop_state))
     de_shapes.append(de_states[n].geometry)
     ax.add_geometries([de_states[n].geometry], ccrs.PlateCarree(), facecolor=colors[n], edgecolor='black')
 
