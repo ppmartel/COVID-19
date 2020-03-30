@@ -168,7 +168,10 @@ for dt in range(int ((end_dt - start_dt).days)+1):
 df_cases.to_csv('COVID-19_WHO_Cases.csv', index = True, encoding='utf-8')
 df_deaths.to_csv('COVID-19_WHO_Deaths.csv', index = True, encoding='utf-8')
 
-df_germany = df_cases.drop(['Continental Region','Statistical Region','Population'], axis=1).loc['Italy']
+df_cases.fillna(0, inplace = True)
+df_deaths.fillna(0, inplace = True)
+
+df_germany = df_cases.drop(['Continental Region','Statistical Region','Population'], axis=1).loc['Germany']
 print(df_germany)
 df_germany.plot(figsize=(15,7),legend=True)
 #df_cases.set_index('Date', inplace=True)
@@ -186,11 +189,12 @@ end_dt = end_dt.strftime("%Y-%m-%d")
 
 reds = cm.get_cmap('Reds', 8)
 
-fig = plt.figure()
+fig = plt.figure(figsize=(13,8))
 ax = fig.add_axes([0, 0, 1, 1], projection=ccrs.Robinson())
 
 shapename = 'admin_0_countries'
-shapefile = shpreader.natural_earth(resolution='110m', category='cultural', name=shapename)
+#shapename = 'admin_0_sovereignty'
+shapefile = shpreader.natural_earth(resolution='10m', category='cultural', name=shapename)
 reader = shpreader.Reader(shapefile)
 countries = list(reader.records())
 
