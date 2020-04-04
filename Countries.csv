@@ -86,7 +86,7 @@ Grenada,Americas,Caribbean,112003
 Guadeloupe,Americas,Caribbean,447905
 Guam,Oceania,Micronesia,167294
 Guatemala,Americas,Central America,17581472
-Guernsey and Jersey,Europe,Northern Europe,172259
+Guernsey,Europe,Northern Europe,63026
 Guinea,Africa,Western Africa,12771246
 Guinea-Bissau,Africa,Western Africa,1920922
 Guyana,Americas,South America,782766
@@ -105,6 +105,7 @@ Israel,Asia,Western Asia,8519377
 Italy,Europe,Southern Europe,60550075
 Jamaica,Americas,Caribbean,2948279
 Japan,Asia,Eastern Asia,126860301
+Jersey,Europe,Northern Europe,106800
 Jordan,Asia,Western Asia,10101694
 Kazakhstan,Asia,Central Asia,18551427
 Kenya,Africa,Eastern Africa,52573973
@@ -175,9 +176,11 @@ Réunion,Africa,Eastern Africa,888927
 Romania,Europe,Eastern Europe,19364557
 Russian Federation,Europe,Eastern Europe,145872256
 Rwanda,Africa,Eastern Africa,12626950
+Saint Barthélemy,Americas,Caribbean,9793
 Saint Helena and Ascension and Tristan da Cunha,Africa,Western Africa,6059
 Saint Kitts and Nevis,Americas,Caribbean,52823
 Saint Lucia,Americas,Caribbean,182790
+Saint Martin,Americas,Caribbean,35107
 Saint Pierre and Miquelon,Americas,Northern America,5822
 Saint Vincent and the Grenadines,Americas,Caribbean,110589
 Samoa,Oceania,Polynesia,197097
