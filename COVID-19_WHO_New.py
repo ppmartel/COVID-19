@@ -190,8 +190,8 @@ df_deaths.fillna(0, inplace = True)
 ##################################################
 from bokeh.io import curdoc, output_notebook, show, output_file
 from bokeh.plotting import figure
-from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, ColorBar
-from bokeh.models import Slider, HoverTool, TapTool, RadioButtonGroup, DatetimeTickFormatter
+from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, LogColorMapper, ColorBar
+from bokeh.models import Slider, HoverTool, TapTool, RadioButtonGroup, DatetimeTickFormatter, LogTicker
 from bokeh.palettes import brewer, Category20_16
 from bokeh.layouts import widgetbox, row, column
 from bokeh.themes import Theme
@@ -257,21 +257,27 @@ show_rep = end_rep
 def make_map(setting):
     #Instantiate LinearColorMapper that linearly maps numbers in a range, into a sequence of colors.
     if setting == 0:
+        min_val = 1
         max_val = max(df_map['Cases_Tot'])
-        tick_labels = {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', 
-                       '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'}
+        #tick_labels = {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', 
+        #               '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'}
+        tick_labels = {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k',
+                       '100000':'100k', '1000000':'1M'}
         plot_col = 'Cases_Tot'
     else:
+        min_val = 0.0005
         max_val = max(df_map['Cases_Per'])
-        tick_labels = {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', 
-                       '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}
+        #tick_labels = {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', 
+        #               '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}
+        tick_labels = {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}
         plot_col = 'Cases_Per'
         
-    color_mapper = LinearColorMapper(palette = palette, low = 0, high = max_val)
+    #color_mapper = LinearColorMapper(palette = palette, low = 0, high = max_val)
+    color_mapper = LogColorMapper(palette = palette, low = min_val, high = max_val)
 
     color_bar = ColorBar(color_mapper=color_mapper, label_standoff=8, width = 500, height = 20, 
                          border_line_color=None, location = (0,0), orientation = 'horizontal', 
-                         major_label_overrides = tick_labels)
+                         ticker=LogTicker(), major_label_overrides = tick_labels)
 
     #Add hover tool
     hover = HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
