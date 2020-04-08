@@ -239,14 +239,14 @@ df_cases_tran.reset_index(inplace = True)
 df_cases_tran.rename(columns = {df_cases_tran.columns[0]:'Date'}, inplace=True)
 df_cases_tran['Date'] = pd.to_datetime(df_cases_tran['Date'])
 df_cases_tran['World'] = df_cases_tran.apply(lambda row: row[1 : -1].sum(),axis=1)
-df_cases_tran['ToolTipDate'] = df_cases_tran.Date.map(lambda x: x.strftime("%b %d")) # Saves work with the tooltip later
+df_cases_tran['ToolTipDate'] = df_cases_tran.Date.map(lambda x: x.strftime("%b %d"))
 
 df_deaths_tran = df_deaths.drop(['Continental Region','Statistical Region','Population'], axis=1).T
 df_deaths_tran.reset_index(inplace = True)
 df_deaths_tran.rename(columns = {df_deaths_tran.columns[0]:'Date'}, inplace=True)
 df_deaths_tran['Date'] = pd.to_datetime(df_deaths_tran['Date'])
 df_deaths_tran['World'] = df_deaths_tran.apply(lambda row: row[1 : -1].sum(),axis=1)
-df_deaths_tran['ToolTipDate'] = df_deaths_tran.Date.map(lambda x: x.strftime("%b %d")) # Saves work with the tooltip later
+df_deaths_tran['ToolTipDate'] = df_deaths_tran.Date.map(lambda x: x.strftime("%b %d"))
 
 df_grp = df_cases_tran[['Date', 'ToolTipDate']].copy()
 df_grp['Country'] = 'World'
@@ -357,8 +357,8 @@ def make_lin(setting):
         plot_col = 'Deaths_Per'
             
     #Create figure object.
-    p = figure(title = 'Linear Plot of COVID-19 '+settings[setting]+' (WHO)', plot_height = 375, plot_width = 475, 
-               x_axis_type = 'datetime', toolbar_location = 'right', 
+    p = figure(title = 'Linear Plot of COVID-19 '+settings[setting]+' (WHO)', toolbar_location = 'right',
+               plot_height = 375, plot_width = 475, x_axis_type = 'datetime', 
                tools = 'pan, wheel_zoom, box_zoom, reset')
     
     # Format your x-axis as datetime.
@@ -390,8 +390,8 @@ def make_log(setting):
         plot_col = 'Deaths_Per'
             
     #Create figure object.
-    p = figure(title = 'Logarithmic Plot of COVID-19 '+settings[setting]+' (WHO)', plot_height = 375, plot_width = 475, 
-               x_axis_type = 'datetime', y_axis_type = 'log', toolbar_location = 'right', 
+    p = figure(title = 'Logarithmic Plot of COVID-19 '+settings[setting]+' (WHO)', toolbar_location = 'right',
+               plot_height = 375, plot_width = 475, x_axis_type = 'datetime', y_axis_type = 'log', 
                tools = 'pan, wheel_zoom, box_zoom, reset')
     
     # Format your x-axis as datetime.
@@ -416,16 +416,18 @@ def make_log(setting):
 def update_plot(attr, old, new):
     try:
         selected_index = source_map.selected.indices[0]
-        df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Cases_Tot', 'Cases_Per', 'Deaths_Tot', 'Deaths_Per', 'Color'])
+        df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Cases_Tot', 'Cases_Per',
+                                       'Deaths_Tot', 'Deaths_Per', 'Color'])
         
         for i, selected_index in enumerate(source_map.selected.indices):
             selected_country = df_cases_map.iloc[selected_index]['Country']
+            pop_country = df_cases_map.iloc[selected_index]['Population']
             df_sel = df_cases_tran[['Date', 'ToolTipDate']].copy()
             df_sel['Country'] = selected_country
             df_sel['Cases_Tot'] = df_cases_tran[selected_country]
-            df_sel['Cases_Per'] = 1000*df_cases_tran[selected_country]/df_cases_map.iloc[selected_index]['Population']
+            df_sel['Cases_Per'] = 1000*df_cases_tran[selected_country]/pop_country
             df_sel['Deaths_Tot'] = df_deaths_tran[selected_country]
-            df_sel['Deaths_Per'] = 1000*df_deaths_tran[selected_country]/df_deaths_map.iloc[selected_index]['Population']
+            df_sel['Deaths_Per'] = 1000*df_deaths_tran[selected_country]/pop_country
             df_sel['Color'] = Category20_16[i]
             df_grp = df_grp.append(df_sel, ignore_index=True)
             
@@ -461,4 +463,3 @@ radio_button.on_change('active', change_var)
 
 # Make a column layout of widgetbox(slider) and plot, and add it to the current document
 curdoc().add_root(column(radio_button, slider, make_map(0), row(make_lin(0), make_log(0))))
-
