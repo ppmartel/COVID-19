@@ -236,7 +236,8 @@ df_tap['ToolTipDate'] = df_tap.Date.map(lambda x: x.strftime("%b %d")) # Saves w
 
 df_grp = df_tap[['Date', 'ToolTipDate']].copy()
 df_grp['Country'] = 'World'
-df_grp['Cases'] = df_tap['World'].copy()
+df_grp['Cases_Tot'] = df_tap['World'].copy()
+df_grp['Cases_Per'] = df_tap['World']/7776350
 df_grp['Color'] = Category20_16[0]
 df_grp = df_grp.sort_values(['Country', 'Date'])
 source_grp = ColumnDataSource(df_grp)
@@ -273,8 +274,8 @@ def make_map(setting):
                          major_label_overrides = tick_labels)
 
     #Add hover tool
-    hover = HoverTool(tooltips = [('Country/region','@Country'), ('Cases','@Cases_Tot'), 
-                                  ('Population','@Population'), ('Cases/1k Ppl','@Cases_Per')])
+    hover = HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
+                                  ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per')])
 
     #Create figure object.
     p = figure(title = 'Map of COVID-19 Cases (WHO)', plot_height = 550 , plot_width = 950, 
@@ -303,6 +304,11 @@ def update_map(attr, old, new):
     source_map.geojson = json_map
 
 def make_lin(setting):
+    if setting == 0:
+        plot_col = 'Cases_Tot'
+    else:
+        plot_col = 'Cases_Per'
+            
     #Create figure object.
     p = figure(title = 'Linear Plot of COVID-19 Cases (WHO)', plot_height = 375, plot_width = 475, 
                x_axis_type = 'datetime', toolbar_location = 'right', 
@@ -311,21 +317,26 @@ def make_lin(setting):
     # Format your x-axis as datetime.
     p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
 
-    #p.line(x = 'Date', y = 'Cases', source=source_grp, line_width=3, line_alpha=0.6, line_color = 'Color', 
+    #p.line(x = 'Date', y = plot_col, source=source_grp, line_width=3, line_alpha=0.6, line_color = 'Color', 
     #         legend_field = 'Country')
-    p.circle(x = 'Date', y = 'Cases', source=source_grp, fill_color = 'Color', line_color = 'Color', 
+    p.circle(x = 'Date', y = plot_col, source=source_grp, fill_color = 'Color', line_color = 'Color', 
              legend_field = 'Country')
     
     p.legend.location = "top_left"
     p.legend.click_policy="mute"
 
     # Add your tooltips
-    p.add_tools(HoverTool(tooltips= [('Date','@ToolTipDate'), ('Country/region','@Country'), 
-                                         ('Cases','@Cases')]))
+    p.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
+                                         ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per')]))
 
     return p
 
 def make_log(setting):
+    if setting == 0:
+        plot_col = 'Cases_Tot'
+    else:
+        plot_col = 'Cases_Per'
+            
     #Create figure object.
     p = figure(title = 'Logarithmic Plot of COVID-19 Cases (WHO)', plot_height = 375, plot_width = 475, 
                x_axis_type = 'datetime', y_axis_type = 'log', toolbar_location = 'right', 
@@ -334,17 +345,17 @@ def make_log(setting):
     # Format your x-axis as datetime.
     p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
 
-    #p.line(x = 'Date', y = 'Cases', source=source_grp, line_width=3, line_alpha=0.6, line_color = 'Color', 
+    #p.line(x = 'Date', y = plot_col, source=source_grp, line_width=3, line_alpha=0.6, line_color = 'Color', 
     #         legend_field = 'Country')
-    p.circle(x = 'Date', y = 'Cases', source=source_grp, fill_color = 'Color', line_color = 'Color', 
+    p.circle(x = 'Date', y = plot_col, source=source_grp, fill_color = 'Color', line_color = 'Color', 
              legend_field = 'Country')
     
     p.legend.location = "top_left"
     p.legend.click_policy="mute"
 
     # Add your tooltips
-    p.add_tools(HoverTool(tooltips= [('Date','@ToolTipDate'), ('Country/region','@Country'), 
-                                         ('Cases','@Cases')]))
+    p.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
+                                         ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per')]))
 
     return p
 
@@ -353,13 +364,14 @@ def update_plot(attr, old, new):
     try:
         selected_index = source_map.selected.indices[0]
         selected_country = df_map.iloc[selected_index]['Country']
-        df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Cases', 'Color'])
+        df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Cases_Tot', 'Cases_Per', 'Color'])
         
         for i, selected_index in enumerate(source_map.selected.indices):
             selected_country = df_map.iloc[selected_index]['Country']
             df_sel = df_tap[['Date', 'ToolTipDate']].copy()
             df_sel['Country'] = selected_country
-            df_sel['Cases'] = df_tap[selected_country].copy()
+            df_sel['Cases_Tot'] = df_tap[selected_country].copy()
+            df_sel['Cases_Per'] = 1000*df_tap[selected_country]/df_map.iloc[selected_index]['Population']
             df_sel['Color'] = Category20_16[i]
             df_grp = df_grp.append(df_sel, ignore_index=True)
             
@@ -369,7 +381,8 @@ def update_plot(attr, old, new):
     except IndexError:
         df_grp = df_tap[['Date', 'ToolTipDate']].copy()
         df_grp['Country'] = 'World'
-        df_grp['Cases'] = df_tap['World'].copy()
+        df_grp['Cases_Tot'] = df_tap['World'].copy()
+        df_grp['Cases_Per'] = df_tap['World']/7776350
         df_grp['Color'] = Category20_16[0]
         df_grp = df_grp.sort_values(['Country', 'Date'])
         source_grp.data = df_grp
