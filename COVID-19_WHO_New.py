@@ -211,33 +211,49 @@ df_geo['Country'] = df_geo['Country'].str.replace('Macedonia','North Macedonia')
 # Remove Antarctica
 df_geo.drop([159], inplace = True)
 
+# Fix multipolygon rendering (though now selecting a polygon does not select the other parts)
 df_geo = df_geo.explode()
+df_geo.reset_index(inplace = True)
 
-df_map = df_geo.merge(df_cases, left_on = 'Country', right_on = 'Country', how = 'left')
+# Merge cases and deaths with map
+df_cases_map = df_geo.merge(df_cases, left_on = 'Country', right_on = 'Country', how = 'left')
+df_deaths_map = df_geo.merge(df_deaths, left_on = 'Country', right_on = 'Country', how = 'left')
 
-df_map['Cases_Tot'] = df_map[end_dt]
-df_map['Cases_Per'] = 1000*df_map[end_dt]/df_map['Population']
+# Build results map
+df_map = df_geo.copy()
+df_map['Population'] = df_cases_map['Population']
+df_map['Cases_Tot'] = df_cases_map[end_dt]
+df_map['Cases_Per'] = 1000*df_cases_map[end_dt]/df_cases_map['Population']
+df_map['Deaths_Tot'] = df_deaths_map[end_dt]
+df_map['Deaths_Per'] = 1000*df_deaths_map[end_dt]/df_deaths_map['Population']
 
 #Read data to json.
 df_map_json = json.loads(df_map.to_json())
-
 #Convert to String like object.
 json_map = json.dumps(df_map_json)
-
 #Input GeoJSON source that contains features for plotting.
 source_map = GeoJSONDataSource(geojson = json_map)
 
-df_tap = df_cases.drop(['Continental Region','Statistical Region','Population'], axis=1).T
-df_tap.reset_index(inplace = True)
-df_tap.rename(columns = {df_tap.columns[0]:'Date'}, inplace=True)
-df_tap['Date'] = pd.to_datetime(df_tap['Date'])
-df_tap['World'] = df_tap.apply(lambda row: row[1 : -1].sum(),axis=1)
-df_tap['ToolTipDate'] = df_tap.Date.map(lambda x: x.strftime("%b %d")) # Saves work with the tooltip later
+df_cases_tran = df_cases.drop(['Continental Region','Statistical Region','Population'], axis=1).T
+df_cases_tran.reset_index(inplace = True)
+df_cases_tran.rename(columns = {df_cases_tran.columns[0]:'Date'}, inplace=True)
+df_cases_tran['Date'] = pd.to_datetime(df_cases_tran['Date'])
+df_cases_tran['World'] = df_cases_tran.apply(lambda row: row[1 : -1].sum(),axis=1)
+df_cases_tran['ToolTipDate'] = df_cases_tran.Date.map(lambda x: x.strftime("%b %d")) # Saves work with the tooltip later
 
-df_grp = df_tap[['Date', 'ToolTipDate']].copy()
+df_deaths_tran = df_deaths.drop(['Continental Region','Statistical Region','Population'], axis=1).T
+df_deaths_tran.reset_index(inplace = True)
+df_deaths_tran.rename(columns = {df_deaths_tran.columns[0]:'Date'}, inplace=True)
+df_deaths_tran['Date'] = pd.to_datetime(df_deaths_tran['Date'])
+df_deaths_tran['World'] = df_deaths_tran.apply(lambda row: row[1 : -1].sum(),axis=1)
+df_deaths_tran['ToolTipDate'] = df_deaths_tran.Date.map(lambda x: x.strftime("%b %d")) # Saves work with the tooltip later
+
+df_grp = df_cases_tran[['Date', 'ToolTipDate']].copy()
 df_grp['Country'] = 'World'
-df_grp['Cases_Tot'] = df_tap['World'].copy()
-df_grp['Cases_Per'] = df_tap['World']/7776350
+df_grp['Cases_Tot'] = df_cases_tran['World']
+df_grp['Cases_Per'] = df_cases_tran['World']/7776350
+df_grp['Deaths_Tot'] = df_deaths_tran['World']
+df_grp['Deaths_Per'] = df_deaths_tran['World']/7776350
 df_grp['Color'] = Category20_16[0]
 df_grp = df_grp.sort_values(['Country', 'Date'])
 source_grp = ColumnDataSource(df_grp)
@@ -264,13 +280,28 @@ def make_map(setting):
         tick_labels = {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k',
                        '100000':'100k', '1000000':'1M'}
         plot_col = 'Cases_Tot'
-    else:
+    elif setting == 1:
         min_val = 0.0005
         max_val = max(df_map['Cases_Per'])
         #tick_labels = {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', 
         #               '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}
         tick_labels = {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}
         plot_col = 'Cases_Per'
+    elif setting == 2:
+        min_val = 1
+        max_val = max(df_map['Deaths_Tot'])
+        #tick_labels = {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', 
+        #               '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'}
+        tick_labels = {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k',
+                       '100000':'100k', '1000000':'1M'}
+        plot_col = 'Deaths_Tot'
+    else:
+        min_val = 0.0005
+        max_val = max(df_map['Deaths_Per'])
+        #tick_labels = {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', 
+        #               '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}
+        tick_labels = {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}
+        plot_col = 'Deaths_Per'
         
     #color_mapper = LinearColorMapper(palette = palette, low = 0, high = max_val)
     color_mapper = LogColorMapper(palette = palette, low = min_val, high = max_val)
@@ -281,10 +312,11 @@ def make_map(setting):
 
     #Add hover tool
     hover = HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
-                                  ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per')])
-
+                                  ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per'),
+                                  ('Deaths','@Deaths_Tot'), ('Deaths/1k Ppl','@Deaths_Per')])
+    
     #Create figure object.
-    p = figure(title = 'Map of COVID-19 Cases (WHO)', plot_height = 550 , plot_width = 950, 
+    p = figure(title = 'Map of COVID-19 '+settings[setting]+' (WHO)', plot_height = 550 , plot_width = 950, 
                toolbar_location = 'right', tools = 'pan, wheel_zoom, box_zoom, reset, tap')
     p.xgrid.grid_line_color = None
     p.ygrid.grid_line_color = None
@@ -303,8 +335,13 @@ def make_map(setting):
 def update_map(attr, old, new):
     show_rep = slider.value
     show_dt = (start_dt + timedelta(show_rep-start_rep)).strftime("%Y-%m-%d")
-    df_map['Cases_Tot'] = df_map[show_dt]
-    df_map['Cases_Per'] = 1000*df_map[show_dt]/df_map['Population']
+
+    df_map['Population'] = df_cases_map['Population']
+    df_map['Cases_Tot'] = df_cases_map[show_dt]
+    df_map['Cases_Per'] = 1000*df_cases_map[show_dt]/df_cases_map['Population']
+    df_map['Deaths_Tot'] = df_deaths_map[show_dt]
+    df_map['Deaths_Per'] = 1000*df_deaths_map[show_dt]/df_deaths_map['Population']
+    
     df_map_json = json.loads(df_map.to_json())
     json_map = json.dumps(df_map_json)
     source_map.geojson = json_map
@@ -312,11 +349,15 @@ def update_map(attr, old, new):
 def make_lin(setting):
     if setting == 0:
         plot_col = 'Cases_Tot'
-    else:
+    elif setting == 1:
         plot_col = 'Cases_Per'
+    elif setting == 2:
+        plot_col = 'Deaths_Tot'
+    else:
+        plot_col = 'Deaths_Per'
             
     #Create figure object.
-    p = figure(title = 'Linear Plot of COVID-19 Cases (WHO)', plot_height = 375, plot_width = 475, 
+    p = figure(title = 'Linear Plot of COVID-19 '+settings[setting]+' (WHO)', plot_height = 375, plot_width = 475, 
                x_axis_type = 'datetime', toolbar_location = 'right', 
                tools = 'pan, wheel_zoom, box_zoom, reset')
     
@@ -333,18 +374,23 @@ def make_lin(setting):
 
     # Add your tooltips
     p.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
-                                         ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per')]))
+                                     ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per'),
+                                     ('Deaths','@Deaths_Tot'), ('Deaths/1k Ppl','@Deaths_Per')]))
 
     return p
 
 def make_log(setting):
     if setting == 0:
         plot_col = 'Cases_Tot'
-    else:
+    elif setting == 1:
         plot_col = 'Cases_Per'
+    elif setting == 2:
+        plot_col = 'Deaths_Tot'
+    else:
+        plot_col = 'Deaths_Per'
             
     #Create figure object.
-    p = figure(title = 'Logarithmic Plot of COVID-19 Cases (WHO)', plot_height = 375, plot_width = 475, 
+    p = figure(title = 'Logarithmic Plot of COVID-19 '+settings[setting]+' (WHO)', plot_height = 375, plot_width = 475, 
                x_axis_type = 'datetime', y_axis_type = 'log', toolbar_location = 'right', 
                tools = 'pan, wheel_zoom, box_zoom, reset')
     
@@ -361,7 +407,8 @@ def make_log(setting):
 
     # Add your tooltips
     p.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
-                                         ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per')]))
+                                     ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per'),
+                                     ('Deaths','@Deaths_Tot'), ('Deaths/1k Ppl','@Deaths_Per')]))
 
     return p
 
@@ -369,15 +416,16 @@ def make_log(setting):
 def update_plot(attr, old, new):
     try:
         selected_index = source_map.selected.indices[0]
-        selected_country = df_map.iloc[selected_index]['Country']
-        df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Cases_Tot', 'Cases_Per', 'Color'])
+        df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Cases_Tot', 'Cases_Per', 'Deaths_Tot', 'Deaths_Per', 'Color'])
         
         for i, selected_index in enumerate(source_map.selected.indices):
-            selected_country = df_map.iloc[selected_index]['Country']
-            df_sel = df_tap[['Date', 'ToolTipDate']].copy()
+            selected_country = df_cases_map.iloc[selected_index]['Country']
+            df_sel = df_cases_tran[['Date', 'ToolTipDate']].copy()
             df_sel['Country'] = selected_country
-            df_sel['Cases_Tot'] = df_tap[selected_country].copy()
-            df_sel['Cases_Per'] = 1000*df_tap[selected_country]/df_map.iloc[selected_index]['Population']
+            df_sel['Cases_Tot'] = df_cases_tran[selected_country]
+            df_sel['Cases_Per'] = 1000*df_cases_tran[selected_country]/df_cases_map.iloc[selected_index]['Population']
+            df_sel['Deaths_Tot'] = df_deaths_tran[selected_country]
+            df_sel['Deaths_Per'] = 1000*df_deaths_tran[selected_country]/df_deaths_map.iloc[selected_index]['Population']
             df_sel['Color'] = Category20_16[i]
             df_grp = df_grp.append(df_sel, ignore_index=True)
             
@@ -385,10 +433,12 @@ def update_plot(attr, old, new):
         source_grp.data = df_grp
 
     except IndexError:
-        df_grp = df_tap[['Date', 'ToolTipDate']].copy()
+        df_grp = df_cases_tran[['Date', 'ToolTipDate']].copy()
         df_grp['Country'] = 'World'
-        df_grp['Cases_Tot'] = df_tap['World'].copy()
-        df_grp['Cases_Per'] = df_tap['World']/7776350
+        df_grp['Cases_Tot'] = df_cases_tran['World']
+        df_grp['Cases_Per'] = df_cases_tran['World']/7776350
+        df_grp['Deaths_Tot'] = df_deaths_tran['World']
+        df_grp['Deaths_Per'] = df_deaths_tran['World']/7776350
         df_grp['Color'] = Category20_16[0]
         df_grp = df_grp.sort_values(['Country', 'Date'])
         source_grp.data = df_grp
@@ -405,8 +455,10 @@ slider.on_change('value', update_map)
 source_map.selected.on_change('indices', update_plot)
 
 # Make a selection of what to plot
-radio_button = RadioButtonGroup(labels=['Cases', 'Cases/Pop'], active=0)
+settings = ['Cases', 'Cases/1k Ppl', 'Deaths', 'Deaths/1k Ppl']
+radio_button = RadioButtonGroup(labels=settings, active=0)
 radio_button.on_change('active', change_var)
 
 # Make a column layout of widgetbox(slider) and plot, and add it to the current document
 curdoc().add_root(column(radio_button, slider, make_map(0), row(make_lin(0), make_log(0))))
+
