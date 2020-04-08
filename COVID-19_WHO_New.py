@@ -154,6 +154,7 @@ for dt in range(int ((end_dt - start_dt).days)+1):
         df_who['Country'] = df_who['Country'].str.replace('Eswatini', 'eSwatini')
         df_who['Country'] = df_who['Country'].str.replace('^Lao.*', 'Laos')
         df_who['Country'] = df_who['Country'].str.replace('occupied Palestinian territory','Palestine')
+        df_who['Country'] = df_who['Country'].str.replace('.*Mariana.*','Northern Mariana Islands')
         df_who['Country'] = df_who['Country'].str.replace('Republic of Korea', 'South Korea')
         df_who['Country'] = df_who['Country'].str.replace('Republic of Moldova', 'Moldova')
         df_who['Country'] = df_who['Country'].str.replace('Russian Federation', 'Russia')
@@ -163,9 +164,8 @@ for dt in range(int ((end_dt - start_dt).days)+1):
         df_who['Country'] = df_who['Country'].str.replace('Timor-Leste','East Timor')
         df_who['Country'] = df_who['Country'].str.replace('The United','United')
         df_who['Country'] = df_who['Country'].str.replace('^Kingdom','United Kingdom')
-        df_who['Country'] = df_who['Country'].str.replace('Viet Nam','Vietnam')
-        
-        df_who['Country'] = df_who['Country'].str.replace('conveyance','Diamond Princess')
+        df_who['Country'] = df_who['Country'].str.replace('Viet Nam','Vietnam')        
+        df_who['Country'] = df_who['Country'].str.replace('.*conveyance.*','Diamond Princess')
 
         df_who.set_index('Country', inplace = True)
         df_who.to_csv('WHO/'+new_date+'.csv', index = True, encoding='utf-8')
@@ -185,11 +185,6 @@ df_deaths.to_csv('COVID-19_WHO_Deaths.csv', index = True, encoding='utf-8')
 df_cases.fillna(0, inplace = True)
 df_deaths.fillna(0, inplace = True)
 
-#df_germany = df_cases.drop(['Continental Region','Statistical Region','Population'], axis=1).loc['Germany']
-#df_germany.plot(figsize=(15,7),legend=True)
-#plt.yscale('log')
-#plt.savefig("COVID-19_WHO.png")
-
 ##################################################
 # Plot world map using geopandas
 ##################################################
@@ -197,7 +192,7 @@ from bokeh.io import curdoc, output_notebook, show, output_file
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, ColorBar
 from bokeh.models import Slider, HoverTool, TapTool, RadioButtonGroup, DatetimeTickFormatter
-from bokeh.palettes import brewer
+from bokeh.palettes import brewer, Category20_16
 from bokeh.layouts import widgetbox, row, column
 from bokeh.themes import Theme
 import geopandas as gpd
@@ -233,12 +228,18 @@ json_map = json.dumps(df_map_json)
 source_map = GeoJSONDataSource(geojson = json_map)
 
 df_tap = df_cases.drop(['Continental Region','Statistical Region','Population'], axis=1).T
-df_tap['Cases'] = df_tap['Germany']
 df_tap.reset_index(inplace = True)
 df_tap.rename(columns = {df_tap.columns[0]:'Date'}, inplace=True)
 df_tap['Date'] = pd.to_datetime(df_tap['Date'])
+df_tap['World'] = df_tap.apply(lambda row: row[1 : -1].sum(),axis=1)
 df_tap['ToolTipDate'] = df_tap.Date.map(lambda x: x.strftime("%b %d")) # Saves work with the tooltip later
-source_tap = ColumnDataSource(df_tap)
+
+df_grp = df_tap[['Date', 'ToolTipDate']].copy()
+df_grp['Country'] = 'World'
+df_grp['Cases'] = df_tap['World'].copy()
+df_grp['Color'] = Category20_16[0]
+df_grp = df_grp.sort_values(['Country', 'Date'])
+source_grp = ColumnDataSource(df_grp)
 
 #Define a sequential multi-hue color palette.
 palette = brewer['YlGnBu'][8]
@@ -274,23 +275,20 @@ def make_map(setting):
     #Add hover tool
     hover = HoverTool(tooltips = [('Country/region','@Country'), ('Cases','@Cases_Tot'), 
                                   ('Population','@Population'), ('Cases/1k Ppl','@Cases_Per')])
-    
-    tap = TapTool()
 
     #Create figure object.
-    p = figure(title = 'Map of COVID-19 Cases (WHO)', plot_height = 600 , plot_width = 950, 
+    p = figure(title = 'Map of COVID-19 Cases (WHO)', plot_height = 550 , plot_width = 950, 
                toolbar_location = 'right', tools = 'pan, wheel_zoom, box_zoom, reset, tap')
     p.xgrid.grid_line_color = None
     p.ygrid.grid_line_color = None
 
     #Add patch renderer to figure. 
-    p.patches('xs','ys', source = source_map, fill_color = {'field' : plot_col, 'transform' : color_mapper},
+    p.patches('xs', 'ys', source = source_map, fill_color = {'field' : plot_col, 'transform' : color_mapper},
               line_color = 'black', line_width = 0.25, fill_alpha = 1)
 
     #Specify figure layout.
     p.add_layout(color_bar, 'below')
     p.add_tools(hover)
-    p.add_tools(tap)
     
     return p
 
@@ -306,33 +304,47 @@ def update_map(attr, old, new):
 
 def make_lin(setting):
     #Create figure object.
-    p = figure(title = 'Linear Plot of COVID-19 Cases (WHO)', plot_height = 450 , plot_width = 450, 
+    p = figure(title = 'Linear Plot of COVID-19 Cases (WHO)', plot_height = 375, plot_width = 475, 
                x_axis_type = 'datetime', toolbar_location = 'right', 
                tools = 'pan, wheel_zoom, box_zoom, reset')
     
     # Format your x-axis as datetime.
     p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
 
-    p.line('Date', 'Cases', source=source_tap, line_width=3, line_alpha=0.6)
+    #p.line(x = 'Date', y = 'Cases', source=source_grp, line_width=3, line_alpha=0.6, line_color = 'Color', 
+    #         legend_field = 'Country')
+    p.circle(x = 'Date', y = 'Cases', source=source_grp, fill_color = 'Color', line_color = 'Color', 
+             legend_field = 'Country')
+    
+    p.legend.location = "top_left"
+    p.legend.click_policy="mute"
 
     # Add your tooltips
-    p.add_tools(HoverTool(tooltips= [('Date','@ToolTipDate'), ('Cases','@Cases')]))
+    p.add_tools(HoverTool(tooltips= [('Date','@ToolTipDate'), ('Country/region','@Country'), 
+                                         ('Cases','@Cases')]))
 
     return p
 
 def make_log(setting):
     #Create figure object.
-    p = figure(title = 'Logarithmic Plot of COVID-19 Cases (WHO)', plot_height = 450 , plot_width = 450, 
+    p = figure(title = 'Logarithmic Plot of COVID-19 Cases (WHO)', plot_height = 375, plot_width = 475, 
                x_axis_type = 'datetime', y_axis_type = 'log', toolbar_location = 'right', 
                tools = 'pan, wheel_zoom, box_zoom, reset')
     
     # Format your x-axis as datetime.
     p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
 
-    p.line('Date', 'Cases', source=source_tap, line_width=3, line_alpha=0.6)
+    #p.line(x = 'Date', y = 'Cases', source=source_grp, line_width=3, line_alpha=0.6, line_color = 'Color', 
+    #         legend_field = 'Country')
+    p.circle(x = 'Date', y = 'Cases', source=source_grp, fill_color = 'Color', line_color = 'Color', 
+             legend_field = 'Country')
+    
+    p.legend.location = "top_left"
+    p.legend.click_policy="mute"
 
     # Add your tooltips
-    p.add_tools(HoverTool(tooltips= [('Date','@ToolTipDate'), ('Cases','@Cases')]))
+    p.add_tools(HoverTool(tooltips= [('Date','@ToolTipDate'), ('Country/region','@Country'), 
+                                         ('Cases','@Cases')]))
 
     return p
 
@@ -341,11 +353,26 @@ def update_plot(attr, old, new):
     try:
         selected_index = source_map.selected.indices[0]
         selected_country = df_map.iloc[selected_index]['Country']
-        df_tap['Cases'] = df_tap[selected_country]
-        source_tap.data = df_tap
+        df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Cases', 'Color'])
+        
+        for i, selected_index in enumerate(source_map.selected.indices):
+            selected_country = df_map.iloc[selected_index]['Country']
+            df_sel = df_tap[['Date', 'ToolTipDate']].copy()
+            df_sel['Country'] = selected_country
+            df_sel['Cases'] = df_tap[selected_country].copy()
+            df_sel['Color'] = Category20_16[i]
+            df_grp = df_grp.append(df_sel, ignore_index=True)
+            
+        df_grp = df_grp.sort_values(['Country', 'Date'])
+        source_grp.data = df_grp
+
     except IndexError:
-        #update_plot('World')
-        pass
+        df_grp = df_tap[['Date', 'ToolTipDate']].copy()
+        df_grp['Country'] = 'World'
+        df_grp['Cases'] = df_tap['World'].copy()
+        df_grp['Color'] = Category20_16[0]
+        df_grp = df_grp.sort_values(['Country', 'Date'])
+        source_grp.data = df_grp
     
 def change_var(attr, old, new):        
     curdoc().clear()
