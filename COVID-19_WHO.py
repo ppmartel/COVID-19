@@ -1,10 +1,10 @@
 from bokeh.io import curdoc, output_notebook, show, output_file
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, LogColorMapper, ColorBar
-from bokeh.models import Slider, HoverTool, TapTool, RadioButtonGroup, DatetimeTickFormatter, LogTicker
+from bokeh.models import HoverTool, TapTool, RadioButtonGroup, DateSlider
+from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, LogTicker
 from bokeh.palettes import brewer, Category20_16
 from bokeh.layouts import row, column
-from bokeh.themes import Theme
 from datetime import timedelta, date, datetime
 import geopandas as gpd
 import json
@@ -31,7 +31,8 @@ else:
     print("Database does not exist")
     sys.exit()
 
-last_dt = last_dt.strftime("%Y-%m-%d")
+show_dt = last_dt.strftime("%Y-%m-%d")
+show_rep = last_rep
 
 df_cases.fillna(0, inplace = True)
 df_deaths.fillna(0, inplace = True)
@@ -52,6 +53,7 @@ df_geo['Country'] = df_geo['Country'].str.replace('Macedonia','North Macedonia')
 
 # Remove Antarctica
 df_geo.drop([159], inplace = True)
+#df_geo.drop([239], inplace = True)
 
 # Fix multipolygon rendering (though now selecting a polygon does not select the other parts)
 df_geo = df_geo.explode()
@@ -64,15 +66,17 @@ df_deaths_map = df_geo.merge(df_deaths, left_on = 'Country', right_on = 'Country
 # Build results map
 df_map = df_geo.copy()
 df_map['Population'] = df_cases_map['Population']
-df_map['Cases_Tot'] = df_cases_map[last_dt]
-df_map['Cases_Per'] = 1000*df_cases_map[last_dt]/df_cases_map['Population']
-df_map['Deaths_Tot'] = df_deaths_map[last_dt]
-df_map['Deaths_Per'] = 1000*df_deaths_map[last_dt]/df_deaths_map['Population']
+df_map['Cases_Tot'] = df_cases_map[show_dt]
+df_map['Cases_Per'] = 1000*df_cases_map[show_dt]/df_cases_map['Population']
+df_map['Deaths_Tot'] = df_deaths_map[show_dt]
+df_map['Deaths_Per'] = 1000*df_deaths_map[show_dt]/df_deaths_map['Population']
 
 #Read data to json.
 df_map_json = json.loads(df_map.to_json())
+
 #Convert to String like object.
 json_map = json.dumps(df_map_json)
+
 #Input GeoJSON source that contains features for plotting.
 source_map = GeoJSONDataSource(geojson = json_map)
 
@@ -105,9 +109,6 @@ palette = brewer['YlGnBu'][8]
 
 #Reverse color order so that dark blue is highest obesity.
 palette = palette[::-1]
-
-show_dt = last_dt
-show_rep = last_rep
 
 def make_map(setting):
     #Instantiate LinearColorMapper that linearly maps numbers in a range, into a sequence of colors.
@@ -172,9 +173,8 @@ def make_map(setting):
 
 # Define the callback function: update_map
 def update_map(attr, old, new):
-    show_rep = slider.value
-    show_dt = (first_dt + timedelta(show_rep-first_rep)).strftime("%Y-%m-%d")
-
+    show_dt = slider.value_as_date.strftime("%Y-%m-%d")
+    
     df_map['Population'] = df_cases_map['Population']
     df_map['Cases_Tot'] = df_cases_map[show_dt]
     df_map['Cases_Per'] = 1000*df_cases_map[show_dt]/df_cases_map['Population']
@@ -202,9 +202,8 @@ def make_lin(setting):
     
     # Format your x-axis as datetime.
     p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
+    p.yaxis[0].formatter = PrintfTickFormatter(format='%.1e')
 
-    #p.line(x = 'Date', y = plot_col, source=source_grp, line_width=3, line_alpha=0.6, line_color = 'Color', 
-    #         legend_field = 'Country')
     p.circle(x = 'Date', y = plot_col, source=source_grp, fill_color = 'Color', line_color = 'Color', 
              legend_field = 'Country')
     
@@ -236,8 +235,6 @@ def make_log(setting):
     # Format your x-axis as datetime.
     p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
 
-    #p.line(x = 'Date', y = plot_col, source=source_grp, line_width=3, line_alpha=0.6, line_color = 'Color', 
-    #         legend_field = 'Country')
     p.circle(x = 'Date', y = plot_col, source=source_grp, fill_color = 'Color', line_color = 'Color', 
              legend_field = 'Country')
     
@@ -289,8 +286,7 @@ def change_var(attr, old, new):
     curdoc().add_root(column(radio_button, slider, make_map(radio_button.active), 
                         row(make_lin(radio_button.active), make_log(radio_button.active))))
 
-# Make a slider object: slider 
-slider = Slider(title = 'Report', start = first_rep, end = last_rep, step = 1, value = last_rep)
+slider = DateSlider(title = 'Date', start = first_dt, end = last_dt, step = 1, value = last_dt, width = 850, margin = (10, 0, 10, 50))
 slider.on_change('value', update_map)
 
 source_map.selected.on_change('indices', update_plot)
