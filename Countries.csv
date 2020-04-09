@@ -6,6 +6,7 @@ American Samoa,Oceania,Polynesia,55312
 Andorra,Europe,Southern Europe,77142
 Angola,Africa,Middle Africa,31825295
 Anguilla,Americas,Caribbean,14869
+Antarctica,Antarctica,Antarctica,4050
 Antigua and Barbuda,Americas,Caribbean,97118
 Argentina,Americas,South America,44780677
 Armenia,Asia,Western Asia,2957731
@@ -13,7 +14,6 @@ Aruba,Americas,Caribbean,106314
 Australia,Oceania,Australia and New Zealand,25203198
 Austria,Europe,Western Europe,8955102
 Azerbaijan,Asia,Western Asia,10047718
-Bahamas,Americas,Caribbean,389482
 Bahrain,Asia,Western Asia,1641172
 Bangladesh,Asia,Southern Asia,163046161
 Barbados,Americas,Caribbean,287025
@@ -28,7 +28,7 @@ Bosnia and Herzegovina,Europe,Southern Europe,3301000
 Botswana,Africa,Southern Africa,2303697
 Brazil,Americas,South America,211049527
 British Virgin Islands,Americas,Caribbean,30030
-Brunei Darussalam,Asia,South-eastern Asia,433285
+Brunei,Asia,South-eastern Asia,433285
 Bulgaria,Europe,Eastern Europe,7000119
 Burkina Faso,Africa,Western Africa,20321378
 Burundi,Africa,Eastern Africa,10864245
@@ -46,27 +46,26 @@ Colombia,Americas,South America,50339443
 Comoros,Africa,Eastern Africa,850886
 Cook Islands,Oceania,Polynesia,17548
 Costa Rica,Americas,Central America,5047561
-Côte d'Ivoire,Africa,Western Africa,25716544
 Croatia,Europe,Southern Europe,4130304
 Cuba,Americas,Caribbean,11333483
 Curaçao,Americas,Caribbean,163424
 Cyprus,Asia,Western Asia,1179551
 Czechia,Europe,Eastern Europe,10689209
+Democratic Republic of the Congo,Africa,Middle Africa,86790567
 Denmark,Europe,Northern Europe,5771876
 Djibouti,Africa,Eastern Africa,973560
 Dominica,Americas,Caribbean,71808
 Dominican Republic,Americas,Caribbean,10738958
-Democratic Republic of the Congo,Africa,Middle Africa,86790567
-Timor-Leste,Asia,South-eastern Asia,1293119
+East Timor,Asia,South-eastern Asia,1293119
 Ecuador,Americas,South America,17373662
 Egypt,Africa,Northern Africa,100388073
 El Salvador,Americas,Central America,6453553
 Equatorial Guinea,Africa,Middle Africa,1355986
 Eritrea,Africa,Eastern Africa,3497117
 Estonia,Europe,Northern Europe,1325648
-Eswatini,Africa,Southern Africa,1148130
+eSwatini,Africa,Southern Africa,1148130
 Ethiopia,Africa,Eastern Africa,112078730
-F.S. Micronesia,Oceania,Micronesia,113815
+Federated States of Micronesia,Oceania,Micronesia,113815
 Falkland Islands,Americas,South America,3377
 Faroe Islands,Europe,Northern Europe,48678
 Fiji,Oceania,Melanesia,889953
@@ -74,6 +73,7 @@ Finland,Europe,Northern Europe,5532156
 France,Europe,Western Europe,65129728
 French Guiana,Americas,South America,282731
 French Polynesia,Oceania,Polynesia,279287
+French Southern and Antarctic Lands,Seven Seas,Seven Seas,140
 Gabon,Africa,Middle Africa,2172579
 Gambia,Africa,Western Africa,2347706
 Georgia,Asia,Western Asia,3996765
@@ -92,7 +92,7 @@ Guinea-Bissau,Africa,Western Africa,1920922
 Guyana,Americas,South America,782766
 Haiti,Americas,Caribbean,11263770
 Honduras,Americas,Central America,9746117
-Hong Kong,Asia,Eastern Asia,7436154
+Hong Kong S.A.R.,Asia,Eastern Asia,7436154
 Hungary,Europe,Eastern Europe,9684679
 Iceland,Europe,Northern Europe,339031
 India,Asia,Southern Asia,1366417754
@@ -103,6 +103,7 @@ Ireland,Europe,Northern Europe,4882495
 Isle of Man,Europe,Northern Europe,84584
 Israel,Asia,Western Asia,8519377
 Italy,Europe,Southern Europe,60550075
+Ivory Coast,Africa,Western Africa,25716544
 Jamaica,Americas,Caribbean,2948279
 Japan,Asia,Eastern Asia,126860301
 Jersey,Europe,Northern Europe,106800
@@ -122,7 +123,7 @@ Libya,Africa,Northern Africa,6777452
 Liechtenstein,Europe,Western Europe,38019
 Lithuania,Europe,Northern Europe,2759627
 Luxembourg,Europe,Western Europe,615729
-Macau,Asia,Eastern Asia,640445
+Macao S.A.R.,Asia,Eastern Asia,640445
 Madagascar,Africa,Eastern Africa,26969307
 Malawi,Africa,Eastern Africa,18628747
 Malaysia,Asia,South-eastern Asia,31949777
@@ -135,6 +136,7 @@ Mauritania,Africa,Western Africa,4525696
 Mauritius,Africa,Eastern Africa,1198575
 Mayotte,Africa,Eastern Africa,266150
 Mexico,Americas,Central America,127575529
+Moldova,Europe,Eastern Europe,4043263
 Monaco,Europe,Western Europe,38964
 Mongolia,Asia,Eastern Asia,3225167
 Montenegro,Europe,Southern Europe,627987
@@ -154,6 +156,7 @@ Nigeria,Africa,Western Africa,200963599
 Niue,Oceania,Polynesia,1615
 North Korea,Asia,Eastern Asia,25666161
 North Macedonia,Europe,Southern Europe,2083459
+Northern Cyprus,Asia,Western Asia,326000
 Northern Mariana Islands,Oceania,Micronesia,56188
 Norway,Europe,Northern Europe,5378857
 Oman,Asia,Western Asia,4974986
@@ -169,15 +172,14 @@ Poland,Europe,Eastern Europe,37887768
 Portugal,Europe,Southern Europe,10226187
 Puerto Rico,Americas,Caribbean,2933408
 Qatar,Asia,Western Asia,2832067
-Republic of Korea,Asia,Eastern Asia,51225308
-Republic of Moldova,Europe,Eastern Europe,4043263
+Republic of Serbia,Europe,Southern Europe,6963764
 Republic of the Congo,Africa,Middle Africa,5380508
 Réunion,Africa,Eastern Africa,888927
 Romania,Europe,Eastern Europe,19364557
-Russian Federation,Europe,Eastern Europe,145872256
+Russia,Europe,Eastern Europe,145872256
 Rwanda,Africa,Eastern Africa,12626950
-Saint Barthélemy,Americas,Caribbean,9793
-Saint Helena and Ascension and Tristan da Cunha,Africa,Western Africa,6059
+Saint Barthelemy,Americas,Caribbean,9793
+Saint Helena,Africa,Western Africa,6059
 Saint Kitts and Nevis,Americas,Caribbean,52823
 Saint Lucia,Americas,Caribbean,182790
 Saint Martin,Americas,Caribbean,35107
@@ -188,7 +190,6 @@ San Marino,Europe,Southern Europe,33860
 São Tomé and Príncipe,Africa,Middle Africa,215056
 Saudi Arabia,Asia,Western Asia,34268528
 Senegal,Africa,Western Africa,16296364
-Serbia,Europe,Southern Europe,6963764
 Seychelles,Africa,Eastern Africa,97739
 Sierra Leone,Africa,Western Africa,7813215
 Singapore,Asia,South-eastern Asia,5804337
@@ -197,7 +198,9 @@ Slovakia,Europe,Eastern Europe,5457013
 Slovenia,Europe,Southern Europe,2078654
 Solomon Islands,Oceania,Melanesia,669823
 Somalia,Africa,Eastern Africa,15442905
+Somaliland,Africa,Eastern Africa,3508180
 South Africa,Africa,Southern Africa,58558270
+South Korea,Asia,Eastern Asia,51225308
 South Sudan,Africa,Eastern Africa,11062113
 Spain,Europe,Southern Europe,46736776
 Sri Lanka,Asia,Southern Asia,21323733
@@ -208,8 +211,8 @@ Switzerland,Europe,Western Europe,8591365
 Syria,Asia,Western Asia,17070135
 Taiwan,Asia,Eastern Asia,23773876
 Tajikistan,Asia,Central Asia,9321018
-Tanzania,Africa,Eastern Africa,58005463
 Thailand,Asia,South-eastern Asia,69037513
+The Bahamas,Americas,Caribbean,389482
 Togo,Africa,Western Africa,8082366
 Tokelau,Oceania,Polynesia,1340
 Tonga,Oceania,Polynesia,110940
@@ -223,12 +226,13 @@ Uganda,Africa,Eastern Africa,44269594
 Ukraine,Europe,Eastern Europe,43993638
 United Arab Emirates,Asia,Western Asia,9770529
 United Kingdom,Europe,Northern Europe,67530172
-United States,Americas,Northern America,329064917
+United Republic of Tanzania,Africa,Eastern Africa,58005463
+United States of America,Americas,Northern America,329064917
 United States Virgin Islands,Americas,Caribbean,104578
 Uruguay,Americas,South America,3461734
 Uzbekistan,Asia,Central Asia,32981716
 Vanuatu,Oceania,Melanesia,299882
-Vatican City,Europe,Southern Europe,799
+Vatican,Europe,Southern Europe,799
 Venezuela,Americas,South America,28515829
 Vietnam,Asia,South-eastern Asia,96462106
 Wallis and Futuna,Oceania,Polynesia,11432
@@ -236,3 +240,4 @@ Western Sahara,Africa,Northern Africa,582463
 Yemen,Asia,Western Asia,29161922
 Zambia,Africa,Eastern Africa,17861030
 Zimbabwe,Africa,Eastern Africa,14645468
+Diamond Princess,Seven Seas,Seven Seas,3711
