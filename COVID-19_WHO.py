@@ -1,7 +1,7 @@
 from bokeh.io import curdoc, output_notebook, show, output_file
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, LogColorMapper, ColorBar
-from bokeh.models import HoverTool, TapTool, RadioButtonGroup, DateSlider
+from bokeh.models import Label, LabelSet, HoverTool, TapTool, RadioButtonGroup, Button, DateSlider, Span
 from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, LogTicker
 from bokeh.palettes import brewer, Category20_16
 from bokeh.layouts import row, column
@@ -11,6 +11,7 @@ import json
 import os
 import pandas as pd
 import sys
+import time
 
 ##################################################
 # Check that the data exists
@@ -104,6 +105,11 @@ df_grp['Color'] = Category20_16[0]
 df_grp = df_grp.sort_values(['Country', 'Date'])
 source_grp = ColumnDataSource(df_grp)
 
+sum_cases_tot = df_grp[df_grp['Date'] == show_dt]['Cases_Tot'].sum()
+sum_cases_per = df_grp[df_grp['Date'] == show_dt]['Cases_Per'].sum()
+sum_deaths_tot = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot'].sum()
+sum_deaths_per = df_grp[df_grp['Date'] == show_dt]['Deaths_Per'].sum()
+
 #Define a sequential multi-hue color palette.
 palette = brewer['YlGnBu'][8]
 
@@ -146,9 +152,9 @@ def make_map(setting):
     #color_mapper = LinearColorMapper(palette = palette, low = 0, high = max_val)
     color_mapper = LogColorMapper(palette = palette, low = min_val, high = max_val)
 
-    color_bar = ColorBar(color_mapper=color_mapper, label_standoff=8, width = 500, height = 20, 
-                         border_line_color=None, location = (0,0), orientation = 'horizontal', 
-                         ticker=LogTicker(), major_label_overrides = tick_labels)
+    color_bar = ColorBar(color_mapper = color_mapper, label_standoff = 8, width = 500, height = 20, 
+                         border_line_color = None, location = (0,0), orientation = 'horizontal', 
+                         ticker = LogTicker(), major_label_overrides = tick_labels)
 
     #Add hover tool
     hover = HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
@@ -157,9 +163,12 @@ def make_map(setting):
     
     #Create figure object.
     p = figure(title = 'Map of COVID-19 '+settings[setting]+' (WHO)', plot_height = 550 , plot_width = 950, 
-               toolbar_location = 'right', tools = 'pan, wheel_zoom, box_zoom, reset, tap')
+               x_range=(-180, 180), y_range=(-65, 90), toolbar_location = 'right',
+               tools = 'pan, wheel_zoom, box_zoom, reset, tap')
     p.xgrid.grid_line_color = None
     p.ygrid.grid_line_color = None
+
+    p.add_layout(labels)
 
     #Add patch renderer to figure. 
     p.patches('xs', 'ys', source = source_map, fill_color = {'field' : plot_col, 'transform' : color_mapper},
@@ -173,7 +182,20 @@ def make_map(setting):
 
 # Define the callback function: update_map
 def update_map(attr, old, new):
+    global show_dt
     show_dt = slider.value_as_date.strftime("%Y-%m-%d")
+    dt_span.update(location=slider.value_as_date)
+
+    sum_cases_tot = df_grp[df_grp['Date'] == show_dt]['Cases_Tot'].sum()
+    sum_cases_per = df_grp[df_grp['Date'] == show_dt]['Cases_Per'].sum()
+    sum_deaths_tot = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot'].sum()
+    sum_deaths_per = df_grp[df_grp['Date'] == show_dt]['Deaths_Per'].sum()
+    source_lab.data = dict(x=[20,20,20,20,20], y=[100,80,60,40,20],
+                           text=[slider.value_as_date.strftime("%d %b %Y"),
+                                 'Cases: {0}'.format(sum_cases_tot),
+                                 'Cases/1k Ppl: {0:.1e}'.format(sum_cases_per),
+                                 'Deaths: {0}'.format(sum_deaths_tot),
+                                 'Deaths/1k Ppl: {0:.1e}'.format(sum_deaths_per)])
     
     df_map['Population'] = df_cases_map['Population']
     df_map['Cases_Tot'] = df_cases_map[show_dt]
@@ -210,6 +232,8 @@ def make_lin(setting):
     p.legend.location = "top_left"
     p.legend.click_policy="mute"
 
+    p.add_layout(dt_span)
+
     # Add your tooltips
     p.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
                                      ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per'),
@@ -241,6 +265,8 @@ def make_log(setting):
     p.legend.location = "top_left"
     p.legend.click_policy="mute"
 
+    p.add_layout(dt_span)
+
     # Add your tooltips
     p.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
                                      ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per'),
@@ -250,6 +276,7 @@ def make_log(setting):
 
 # Define the callback function: update_plot
 def update_plot(attr, old, new):
+    global df_grp
     try:
         selected_index = source_map.selected.indices[0]
         df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Cases_Tot', 'Cases_Per',
@@ -280,21 +307,75 @@ def update_plot(attr, old, new):
         df_grp['Color'] = Category20_16[0]
         df_grp = df_grp.sort_values(['Country', 'Date'])
         source_grp.data = df_grp
+
+    sum_cases_tot = df_grp[df_grp['Date'] == show_dt]['Cases_Tot'].sum()
+    sum_cases_per = df_grp[df_grp['Date'] == show_dt]['Cases_Per'].sum()
+    sum_deaths_tot = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot'].sum()
+    sum_deaths_per = df_grp[df_grp['Date'] == show_dt]['Deaths_Per'].sum()
+    source_lab.data = dict(x=[20,20,20,20,20], y=[100,80,60,40,20],
+                           text=[slider.value_as_date.strftime("%d %b %Y"),
+                                 'Cases: {0}'.format(sum_cases_tot),
+                                 'Cases/1k Ppl: {0:.1e}'.format(sum_cases_per),
+                                 'Deaths: {0}'.format(sum_deaths_tot),
+                                 'Deaths/1k Ppl: {0:.1e}'.format(sum_deaths_per)])
     
-def change_var(attr, old, new):        
+def change_var(attr, old, new):
     curdoc().clear()
-    curdoc().add_root(column(radio_button, slider, make_map(radio_button.active), 
+    curdoc().add_root(column(radio_button, row(button, slider), make_map(radio_button.active), 
                         row(make_lin(radio_button.active), make_log(radio_button.active))))
 
-slider = DateSlider(title = 'Date', start = first_dt, end = last_dt, step = 1, value = last_dt, width = 850, margin = (10, 0, 10, 50))
-slider.on_change('value', update_map)
+def animate_update():
+    global show_dt
+    slider.value = slider.value_as_date + timedelta(1)
+    show_dt = slider.value_as_date.strftime("%Y-%m-%d")
+    if last_dt.date() == slider.value_as_date:
+        animate()
 
-source_map.selected.on_change('indices', update_plot)
+callback_id = None
+
+def animate():
+    global callback_id
+    if button.label == '► Play':
+        slider.on_change('value', update_map)
+        if last_dt.date() == slider.value_as_date:
+            slider.value = first_dt
+        button.label = '❚❚ Pause'
+        callback_id = curdoc().add_periodic_callback(animate_update, 1)
+    else:
+        slider.remove_on_change('value', update_map)
+        button.label = '► Play'
+        curdoc().remove_periodic_callback(callback_id)
 
 # Make a selection of what to plot
 settings = ['Cases', 'Cases/1k Ppl', 'Deaths', 'Deaths/1k Ppl']
 radio_button = RadioButtonGroup(labels=settings, active=0)
 radio_button.on_change('active', change_var)
 
+# Make a toggle to cycle through the dates
+button = Button(label='► Play', width=90, margin = (20, 0, 0, 10))
+button.on_click(animate)
+
+# Make a selection of the date to plot
+slider = DateSlider(title = 'Date', start = first_dt, end = last_dt, step = 1, value = last_dt, width = 750,
+                    margin = (10, 0, 10, 50))
+slider.on_change('value_throttled', update_map)
+
+# Make a span to show current date in plots
+dt_span = Span(location=slider.value_as_date, dimension='height', line_color='red', line_dash='solid',
+               line_width=2)
+
+# Update timeseries plots based on selection
+source_map.selected.on_change('indices', update_plot)
+
+# Make a set of labels to show some totals on the map
+source_lab = ColumnDataSource(data=dict(x=[20,20,20,20,20], y=[100,80,60,40,20],
+                                        text=[slider.value_as_date.strftime("%d %b %Y"),
+                                              'Cases: {0}'.format(sum_cases_tot),
+                                              'Cases/1k Ppl: {0:.1e}'.format(sum_cases_per),
+                                              'Deaths: {0}'.format(sum_deaths_tot),
+                                              'Deaths/1k Ppl: {0:.1e}'.format(sum_deaths_per)]))
+labels = LabelSet(x='x', y='y', x_units='screen', y_units='screen', text='text', source=source_lab,
+                  background_fill_color='white', background_fill_alpha=1.0)
+
 # Make a column layout of widgets and plots
-curdoc().add_root(column(radio_button, slider, make_map(0), row(make_lin(0), make_log(0))))
+curdoc().add_root(column(radio_button, row(button, slider), make_map(0), row(make_lin(0), make_log(0))))
