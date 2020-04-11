@@ -2,7 +2,7 @@ from bokeh.io import curdoc, output_notebook, show, output_file
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, LogColorMapper, ColorBar
 from bokeh.models import Label, LabelSet, HoverTool, TapTool, RadioButtonGroup, Button, DateSlider, Span
-from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, LogTicker
+from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, LogTicker, Toggle
 from bokeh.palettes import brewer, Category20_16
 from bokeh.layouts import row, column
 from datetime import timedelta, date, datetime
@@ -116,45 +116,57 @@ palette = brewer['YlGnBu'][8]
 #Reverse color order so that dark blue is highest obesity.
 palette = palette[::-1]
 
-def make_map(setting):
+def make_map(setting, linear):
     #Instantiate LinearColorMapper that linearly maps numbers in a range, into a sequence of colors.
     if setting == 0:
         min_val = 1
         max_val = max(df_map['Cases_Tot'])
-        #tick_labels = {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', 
-        #               '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'}
-        tick_labels = {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k',
-                       '100000':'100k', '1000000':'1M'}
+        if linear:
+            tick_labels = {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', 
+                           '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'}
+        else:
+            tick_labels = {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k',
+                           '100000':'100k', '1000000':'1M'}
         plot_col = 'Cases_Tot'
     elif setting == 1:
         min_val = 0.0005
         max_val = max(df_map['Cases_Per'])
-        #tick_labels = {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', 
-        #               '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}
-        tick_labels = {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}
+        if linear:
+            tick_labels = {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', 
+                           '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}
+        else:
+            tick_labels = {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}
         plot_col = 'Cases_Per'
     elif setting == 2:
         min_val = 1
         max_val = max(df_map['Deaths_Tot'])
-        #tick_labels = {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', 
-        #               '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'}
-        tick_labels = {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k',
-                       '100000':'100k', '1000000':'1M'}
+        if linear:
+            tick_labels = {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', 
+                           '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'}
+        else:
+            tick_labels = {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k',
+                           '100000':'100k', '1000000':'1M'}
         plot_col = 'Deaths_Tot'
     else:
         min_val = 0.0005
         max_val = max(df_map['Deaths_Per'])
-        #tick_labels = {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', 
-        #               '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}
-        tick_labels = {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}
+        if linear:
+            tick_labels = {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', 
+                           '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}
+        else:
+            tick_labels = {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}
         plot_col = 'Deaths_Per'
-        
-    #color_mapper = LinearColorMapper(palette = palette, low = 0, high = max_val)
-    color_mapper = LogColorMapper(palette = palette, low = min_val, high = max_val)
 
-    color_bar = ColorBar(color_mapper = color_mapper, label_standoff = 8, width = 500, height = 20, 
-                         border_line_color = None, location = (0,0), orientation = 'horizontal', 
-                         ticker = LogTicker(), major_label_overrides = tick_labels)
+    if linear:
+        color_mapper = LinearColorMapper(palette = palette, low = 0, high = max_val)
+        color_bar = ColorBar(color_mapper = color_mapper, label_standoff = 8, width = 500, height = 20, 
+                             border_line_color = None, location = (0,0), orientation = 'horizontal', 
+                             major_label_overrides = tick_labels)
+    else:
+        color_mapper = LogColorMapper(palette = palette, low = min_val, high = max_val)
+        color_bar = ColorBar(color_mapper = color_mapper, label_standoff = 8, width = 500, height = 20, 
+                             border_line_color = None, location = (0,0), orientation = 'horizontal', 
+                             ticker = LogTicker(), major_label_overrides = tick_labels)
 
     #Add hover tool
     hover = HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
@@ -321,7 +333,7 @@ def update_plot(attr, old, new):
     
 def change_var(attr, old, new):
     curdoc().clear()
-    curdoc().add_root(column(radio_button, row(button, slider), make_map(radio_button.active), 
+    curdoc().add_root(column(radio_button, row(button, slider, lin_map), make_map(radio_button.active, lin_map.active), 
                         row(make_lin(radio_button.active), make_log(radio_button.active))))
 
 def animate_update():
@@ -356,9 +368,13 @@ button = Button(label='► Play', width=90, margin = (20, 0, 0, 10))
 button.on_click(animate)
 
 # Make a selection of the date to plot
-slider = DateSlider(title = 'Date', start = first_dt, end = last_dt, step = 1, value = last_dt, width = 750,
-                    margin = (10, 0, 10, 50))
+slider = DateSlider(title = 'Date', start = first_dt, end = last_dt, step = 1, value = last_dt, width = 650,
+                    margin = (10, 40, 10, 50))
 slider.on_change('value_throttled', update_map)
+
+# Make a toggle for changing the map to linear
+lin_map = Toggle(label = 'Linear Map', active = False, width = 90, margin = (20, 10, 0, 10))
+lin_map.on_change('active', change_var)
 
 # Make a span to show current date in plots
 dt_span = Span(location=slider.value_as_date, dimension='height', line_color='red', line_dash='solid',
@@ -378,4 +394,4 @@ labels = LabelSet(x='x', y='y', x_units='screen', y_units='screen', text='text',
                   background_fill_color='white', background_fill_alpha=1.0)
 
 # Make a column layout of widgets and plots
-curdoc().add_root(column(radio_button, row(button, slider), make_map(0), row(make_lin(0), make_log(0))))
+curdoc().add_root(column(radio_button, row(button, slider, lin_map), make_map(0,False), row(make_lin(0), make_log(0))))
