@@ -2,7 +2,7 @@ from bokeh.io import curdoc, output_notebook, show, output_file
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, LogColorMapper, ColorBar
 from bokeh.models import Label, LabelSet, HoverTool, TapTool, RadioButtonGroup, Button, DateSlider, Span
-from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, LogTicker, Toggle
+from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, BasicTicker, LogTicker, Toggle
 from bokeh.palettes import brewer, Category20_16
 from bokeh.layouts import row, column
 from datetime import timedelta, date, datetime
@@ -71,6 +71,7 @@ df_map['Cases_Tot'] = df_cases_map[show_dt]
 df_map['Cases_Per'] = 1000*df_cases_map[show_dt]/df_cases_map['Population']
 df_map['Deaths_Tot'] = df_deaths_map[show_dt]
 df_map['Deaths_Per'] = 1000*df_deaths_map[show_dt]/df_deaths_map['Population']
+df_map['Selected'] = df_map['Cases_Tot']
 
 #Read data to json.
 df_map_json = json.loads(df_map.to_json())
@@ -101,6 +102,7 @@ df_grp['Cases_Tot'] = df_cases_tran['World']
 df_grp['Cases_Per'] = df_cases_tran['World']/7776350
 df_grp['Deaths_Tot'] = df_deaths_tran['World']
 df_grp['Deaths_Per'] = df_deaths_tran['World']/7776350
+df_grp['Selected'] = df_grp['Cases_Tot']
 df_grp['Color'] = Category20_16[0]
 df_grp = df_grp.sort_values(['Country', 'Date'])
 source_grp = ColumnDataSource(df_grp)
@@ -115,46 +117,6 @@ palette = brewer['YlGnBu'][8]
 
 #Reverse color order so that dark blue is highest obesity.
 palette = palette[::-1]
-
-def make_map(setting, linear):
-    #Instantiate LinearColorMapper that linearly maps numbers in a range, into a sequence of colors.
-    min_val = plot_min[setting]
-    max_val = plot_max[setting]
-
-    if linear:
-        color_mapper = LinearColorMapper(palette = palette, low = 0, high = max_val)
-        color_bar = ColorBar(color_mapper = color_mapper, label_standoff = 8, width = 500, height = 20, 
-                             border_line_color = None, location = (0,0), orientation = 'horizontal', 
-                             major_label_overrides = tick_lin[setting])
-    else:
-        color_mapper = LogColorMapper(palette = palette, low = min_val, high = max_val)
-        color_bar = ColorBar(color_mapper = color_mapper, label_standoff = 8, width = 500, height = 20, 
-                             border_line_color = None, location = (0,0), orientation = 'horizontal', 
-                             ticker = LogTicker(), major_label_overrides = tick_log[setting])
-
-    #Add hover tool
-    hover = HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
-                                  ('Cases','@Cases_Tot (@Cases_Per/1k Ppl)'),
-                                  ('Deaths','@Deaths_Tot (@Deaths_Per/1k Ppl)')])
-    
-    #Create figure object.
-    p = figure(title = 'Map of COVID-19 '+plot_title[setting]+' (WHO)', plot_height = 550 , plot_width = 950, 
-               x_range=(-180, 180), y_range=(-65, 90), toolbar_location = 'right',
-               tools = 'pan, wheel_zoom, box_zoom, reset, tap')
-    p.xgrid.grid_line_color = None
-    p.ygrid.grid_line_color = None
-
-    p.add_layout(labels)
-
-    #Add patch renderer to figure. 
-    p.patches('xs', 'ys', source = source_map, fill_color = {'field' : plot_var[setting], 'transform' : color_mapper},
-              line_color = 'black', line_width = 0.25, fill_alpha = 1)
-
-    #Specify figure layout.
-    p.add_layout(color_bar, 'below')
-    p.add_tools(hover)
-    
-    return p
 
 # Define the callback function: update_map
 def update_map(attr, old, new):
@@ -178,59 +140,11 @@ def update_map(attr, old, new):
     df_map['Cases_Per'] = 1000*df_cases_map[show_dt]/df_cases_map['Population']
     df_map['Deaths_Tot'] = df_deaths_map[show_dt]
     df_map['Deaths_Per'] = 1000*df_deaths_map[show_dt]/df_deaths_map['Population']
+    df_map['Selected'] = df_map[plot_var[radio_button.active]]
     
     df_map_json = json.loads(df_map.to_json())
     json_map = json.dumps(df_map_json)
     source_map.geojson = json_map
-
-def make_lin(setting):
-    #Create figure object.
-    p = figure(title = 'Linear Plot of COVID-19 '+plot_title[setting]+' (WHO)', toolbar_location = 'right',
-               plot_height = 375, plot_width = 475, x_axis_type = 'datetime', 
-               tools = 'pan, wheel_zoom, box_zoom, reset')
-    
-    # Format your x-axis as datetime.
-    p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
-    p.yaxis[0].formatter = PrintfTickFormatter(format='%.1e')
-
-    p.circle(x = 'Date', y = plot_var[setting], source=source_grp, fill_color = 'Color', line_color = 'Color', 
-             legend_field = 'Country')
-    
-    p.legend.location = "top_left"
-    p.legend.click_policy="mute"
-
-    p.add_layout(dt_span)
-
-    # Add your tooltips
-    p.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
-                                     ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per'),
-                                     ('Deaths','@Deaths_Tot'), ('Deaths/1k Ppl','@Deaths_Per')]))
-
-    return p
-
-def make_log(setting):
-    #Create figure object.
-    p = figure(title = 'Logarithmic Plot of COVID-19 '+plot_title[setting]+' (WHO)', toolbar_location = 'right',
-               plot_height = 375, plot_width = 475, x_axis_type = 'datetime', y_axis_type = 'log', 
-               tools = 'pan, wheel_zoom, box_zoom, reset')
-    
-    # Format your x-axis as datetime.
-    p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
-
-    p.circle(x = 'Date', y = plot_var[setting], source=source_grp, fill_color = 'Color', line_color = 'Color', 
-             legend_field = 'Country')
-    
-    p.legend.location = "top_left"
-    p.legend.click_policy="mute"
-
-    p.add_layout(dt_span)
-
-    # Add your tooltips
-    p.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
-                                     ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per'),
-                                     ('Deaths','@Deaths_Tot'), ('Deaths/1k Ppl','@Deaths_Per')]))
-
-    return p
 
 # Define the callback function: update_plot
 def update_plot(attr, old, new):
@@ -238,7 +152,7 @@ def update_plot(attr, old, new):
     try:
         selected_index = source_map.selected.indices[0]
         df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Cases_Tot', 'Cases_Per',
-                                       'Deaths_Tot', 'Deaths_Per', 'Color'])
+                                       'Deaths_Tot', 'Deaths_Per', 'Selected', 'Color'])
         
         for i, selected_index in enumerate(source_map.selected.indices):
             selected_country = df_cases_map.iloc[selected_index]['Country']
@@ -249,6 +163,7 @@ def update_plot(attr, old, new):
             df_sel['Cases_Per'] = 1000*df_cases_tran[selected_country]/pop_country
             df_sel['Deaths_Tot'] = df_deaths_tran[selected_country]
             df_sel['Deaths_Per'] = 1000*df_deaths_tran[selected_country]/pop_country
+            df_sel['Selected'] = df_sel[plot_var[radio_button.active]]
             df_sel['Color'] = Category20_16[i]
             df_grp = df_grp.append(df_sel, ignore_index=True)
             
@@ -262,6 +177,7 @@ def update_plot(attr, old, new):
         df_grp['Cases_Per'] = df_cases_tran['World']/7776350
         df_grp['Deaths_Tot'] = df_deaths_tran['World']
         df_grp['Deaths_Per'] = df_deaths_tran['World']/7776350
+        df_grp['Selected'] = df_grp[plot_var[radio_button.active]]
         df_grp['Color'] = Category20_16[0]
         df_grp = df_grp.sort_values(['Country', 'Date'])
         source_grp.data = df_grp
@@ -278,9 +194,26 @@ def update_plot(attr, old, new):
                                  'Deaths/1k Ppl: {0:.1e}'.format(sum_deaths_per)])
     
 def change_var(attr, old, new):
-    curdoc().clear()
-    curdoc().add_root(column(radio_button, row(button, slider, lin_map), make_map(radio_button.active, lin_map.active), 
-                        row(make_lin(radio_button.active), make_log(radio_button.active))))
+    fig_map.title.text = 'Map of COVID-19 '+plot_title[radio_button.active]+' (WHO)'
+    fig_lin.title.text = 'Linear Plot of COVID-19 '+plot_title[radio_button.active]+' (WHO)'
+    fig_log.title.text = 'Logarithmic Plot of COVID-19 '+plot_title[radio_button.active]+' (WHO)'
+    
+    if lin_map.active:
+        lin_mapper.update(low = 0, high = plot_max[radio_button.active])
+        color_bar.update(color_mapper = lin_mapper, ticker = BasicTicker(), major_label_overrides = tick_lin[radio_button.active])
+        ren_map.glyph.fill_color = {'field' : 'Selected', 'transform' : lin_mapper}
+    else:
+        log_mapper.update(low = plot_min[radio_button.active], high = plot_max[radio_button.active])
+        color_bar.update(color_mapper = log_mapper, ticker = LogTicker(), major_label_overrides = tick_log[radio_button.active])
+        ren_map.glyph.fill_color = {'field' : 'Selected', 'transform' : log_mapper}
+    
+    df_map['Selected'] = df_map[plot_var[radio_button.active]]
+    df_map_json = json.loads(df_map.to_json())
+    json_map = json.dumps(df_map_json)
+    source_map.geojson = json_map
+    
+    df_grp['Selected'] = df_grp[plot_var[radio_button.active]]
+    source_grp.data = df_grp
 
 def animate_update():
     global show_dt
@@ -351,5 +284,78 @@ source_lab = ColumnDataSource(data=dict(x=[20,20,20,20,20], y=[100,80,60,40,20],
 labels = LabelSet(x='x', y='y', x_units='screen', y_units='screen', text='text', source=source_lab,
                   background_fill_color='white', background_fill_alpha=1.0)
 
+# Make the map
+#Instantiate LinearColorMapper that linearly maps numbers in a range, into a sequence of colors
+lin_mapper = LinearColorMapper(palette = palette, low = 0, high = plot_max[0])
+log_mapper = LogColorMapper(palette = palette, low = plot_min[0], high = plot_max[0])
+color_bar = ColorBar(color_mapper = log_mapper, label_standoff = 8, width = 500, height = 20, 
+                     border_line_color = None, location = (0,0), orientation = 'horizontal', 
+                     ticker = LogTicker(), major_label_overrides = tick_log[0])
+
+#Add hover tool
+hover = HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
+                              ('Cases','@Cases_Tot (@Cases_Per/1k Ppl)'),
+                              ('Deaths','@Deaths_Tot (@Deaths_Per/1k Ppl)')])
+
+#Create figure object.
+fig_map = figure(title = 'Map of COVID-19 '+plot_title[0]+' (WHO)', plot_height = 550 , plot_width = 950, 
+                 x_range=(-180, 180), y_range=(-65, 90), toolbar_location = 'right',
+                 tools = 'pan, wheel_zoom, box_zoom, reset, tap')
+fig_map.xgrid.grid_line_color = None
+fig_map.ygrid.grid_line_color = None
+
+fig_map.add_layout(labels)
+
+#Add patch renderer to figure. 
+ren_map = fig_map.patches('xs', 'ys', source = source_map, fill_color = {'field' : 'Selected', 'transform' : log_mapper},
+                          line_color = 'black', line_width = 0.25, fill_alpha = 1)
+
+#Specify figure layout.
+fig_map.add_layout(color_bar, 'below')
+fig_map.add_tools(hover)
+
+#Create figure object.
+fig_lin = figure(title = 'Linear Plot of COVID-19 '+plot_title[0]+' (WHO)', toolbar_location = 'right',
+                 plot_height = 375, plot_width = 475, x_axis_type = 'datetime', 
+                 tools = 'pan, wheel_zoom, box_zoom, reset')
+
+# Format your x-axis as datetime.
+fig_lin.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
+fig_lin.yaxis[0].formatter = PrintfTickFormatter(format='%.1e')
+
+fig_lin.circle(x = 'Date', y = 'Selected', source=source_grp, fill_color = 'Color', line_color = 'Color', 
+         legend_field = 'Country')
+
+fig_lin.legend.location = "top_left"
+fig_lin.legend.click_policy="mute"
+
+fig_lin.add_layout(dt_span)
+
+# Add your tooltips
+fig_lin.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
+                                 ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per'),
+                                 ('Deaths','@Deaths_Tot'), ('Deaths/1k Ppl','@Deaths_Per')]))
+
+#Create figure object.
+fig_log = figure(title = 'Logarithmic Plot of COVID-19 '+plot_title[0]+' (WHO)', toolbar_location = 'right',
+           plot_height = 375, plot_width = 475, x_axis_type = 'datetime', y_axis_type = 'log', 
+           tools = 'pan, wheel_zoom, box_zoom, reset')
+
+# Format your x-axis as datetime.
+fig_log.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
+
+fig_log.circle(x = 'Date', y = 'Selected', source=source_grp, fill_color = 'Color', line_color = 'Color', 
+         legend_field = 'Country')
+
+fig_log.legend.location = "top_left"
+fig_log.legend.click_policy="mute"
+
+fig_log.add_layout(dt_span)
+
+# Add your tooltips
+fig_log.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
+                                 ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per'),
+                                 ('Deaths','@Deaths_Tot'), ('Deaths/1k Ppl','@Deaths_Per')]))
+
 # Make a column layout of widgets and plots
-curdoc().add_root(column(radio_button, row(button, slider, lin_map), make_map(0,False), row(make_lin(0), make_log(0))))
+curdoc().add_root(column(radio_button, row(button, slider, lin_map), fig_map, row(fig_lin, fig_log)))
