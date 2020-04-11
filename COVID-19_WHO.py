@@ -146,7 +146,7 @@ def make_map(setting, linear):
             tick_labels = {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}
 
     min_val = plot_min[setting]
-    max_val = max(df_map[plot_var[setting]])
+    max_val = plot_max[setting]
 
     if linear:
         color_mapper = LinearColorMapper(palette = palette, low = 0, high = max_val)
@@ -335,6 +335,8 @@ def animate():
 plot_title = ['Cases', 'Cases/1k Ppl', 'Deaths', 'Deaths/1k Ppl']
 plot_var = ['Cases_Tot', 'Cases_Per', 'Deaths_Tot', 'Deaths_Per']
 plot_min = [1, 0.0005, 1, 0.0005]
+plot_max = [max(df_map[plot_var[0]]), max(df_map[plot_var[1]]), max(df_map[plot_var[2]]), max(df_map[plot_var[3]])]
+
 radio_button = RadioButtonGroup(labels=plot_title, active=0)
 radio_button.on_change('active', change_var)
 
