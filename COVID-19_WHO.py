@@ -161,8 +161,8 @@ def make_map(setting, linear):
 
     #Add hover tool
     hover = HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
-                                  ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per'),
-                                  ('Deaths','@Deaths_Tot'), ('Deaths/1k Ppl','@Deaths_Per')])
+                                  ('Cases','@Cases_Tot (@Cases_Per/1k Ppl)'),
+                                  ('Deaths','@Deaths_Tot (@Deaths_Per/1k Ppl)')])
     
     #Create figure object.
     p = figure(title = 'Map of COVID-19 '+plot_title[setting]+' (WHO)', plot_height = 550 , plot_width = 950, 
