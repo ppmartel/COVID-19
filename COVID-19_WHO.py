@@ -119,43 +119,34 @@ palette = palette[::-1]
 def make_map(setting, linear):
     #Instantiate LinearColorMapper that linearly maps numbers in a range, into a sequence of colors.
     if setting == 0:
-        min_val = 1
-        max_val = max(df_map['Cases_Tot'])
         if linear:
             tick_labels = {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', 
                            '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'}
         else:
             tick_labels = {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k',
                            '100000':'100k', '1000000':'1M'}
-        plot_col = 'Cases_Tot'
     elif setting == 1:
-        min_val = 0.0005
-        max_val = max(df_map['Cases_Per'])
         if linear:
             tick_labels = {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', 
                            '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}
         else:
             tick_labels = {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}
-        plot_col = 'Cases_Per'
     elif setting == 2:
-        min_val = 1
-        max_val = max(df_map['Deaths_Tot'])
         if linear:
             tick_labels = {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', 
                            '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'}
         else:
             tick_labels = {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k',
                            '100000':'100k', '1000000':'1M'}
-        plot_col = 'Deaths_Tot'
     else:
-        min_val = 0.0005
-        max_val = max(df_map['Deaths_Per'])
         if linear:
             tick_labels = {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', 
                            '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}
         else:
             tick_labels = {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}
-        plot_col = 'Deaths_Per'
+
+    min_val = plot_min[setting]
+    max_val = max(df_map[plot_var[setting]])
 
     if linear:
         color_mapper = LinearColorMapper(palette = palette, low = 0, high = max_val)
@@ -174,7 +165,7 @@ def make_map(setting, linear):
                                   ('Deaths','@Deaths_Tot'), ('Deaths/1k Ppl','@Deaths_Per')])
     
     #Create figure object.
-    p = figure(title = 'Map of COVID-19 '+settings[setting]+' (WHO)', plot_height = 550 , plot_width = 950, 
+    p = figure(title = 'Map of COVID-19 '+plot_title[setting]+' (WHO)', plot_height = 550 , plot_width = 950, 
                x_range=(-180, 180), y_range=(-65, 90), toolbar_location = 'right',
                tools = 'pan, wheel_zoom, box_zoom, reset, tap')
     p.xgrid.grid_line_color = None
@@ -183,7 +174,7 @@ def make_map(setting, linear):
     p.add_layout(labels)
 
     #Add patch renderer to figure. 
-    p.patches('xs', 'ys', source = source_map, fill_color = {'field' : plot_col, 'transform' : color_mapper},
+    p.patches('xs', 'ys', source = source_map, fill_color = {'field' : plot_var[setting], 'transform' : color_mapper},
               line_color = 'black', line_width = 0.25, fill_alpha = 1)
 
     #Specify figure layout.
@@ -220,17 +211,8 @@ def update_map(attr, old, new):
     source_map.geojson = json_map
 
 def make_lin(setting):
-    if setting == 0:
-        plot_col = 'Cases_Tot'
-    elif setting == 1:
-        plot_col = 'Cases_Per'
-    elif setting == 2:
-        plot_col = 'Deaths_Tot'
-    else:
-        plot_col = 'Deaths_Per'
-            
     #Create figure object.
-    p = figure(title = 'Linear Plot of COVID-19 '+settings[setting]+' (WHO)', toolbar_location = 'right',
+    p = figure(title = 'Linear Plot of COVID-19 '+plot_title[setting]+' (WHO)', toolbar_location = 'right',
                plot_height = 375, plot_width = 475, x_axis_type = 'datetime', 
                tools = 'pan, wheel_zoom, box_zoom, reset')
     
@@ -238,7 +220,7 @@ def make_lin(setting):
     p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
     p.yaxis[0].formatter = PrintfTickFormatter(format='%.1e')
 
-    p.circle(x = 'Date', y = plot_col, source=source_grp, fill_color = 'Color', line_color = 'Color', 
+    p.circle(x = 'Date', y = plot_var[setting], source=source_grp, fill_color = 'Color', line_color = 'Color', 
              legend_field = 'Country')
     
     p.legend.location = "top_left"
@@ -254,24 +236,15 @@ def make_lin(setting):
     return p
 
 def make_log(setting):
-    if setting == 0:
-        plot_col = 'Cases_Tot'
-    elif setting == 1:
-        plot_col = 'Cases_Per'
-    elif setting == 2:
-        plot_col = 'Deaths_Tot'
-    else:
-        plot_col = 'Deaths_Per'
-            
     #Create figure object.
-    p = figure(title = 'Logarithmic Plot of COVID-19 '+settings[setting]+' (WHO)', toolbar_location = 'right',
+    p = figure(title = 'Logarithmic Plot of COVID-19 '+plot_title[setting]+' (WHO)', toolbar_location = 'right',
                plot_height = 375, plot_width = 475, x_axis_type = 'datetime', y_axis_type = 'log', 
                tools = 'pan, wheel_zoom, box_zoom, reset')
     
     # Format your x-axis as datetime.
     p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
 
-    p.circle(x = 'Date', y = plot_col, source=source_grp, fill_color = 'Color', line_color = 'Color', 
+    p.circle(x = 'Date', y = plot_var[setting], source=source_grp, fill_color = 'Color', line_color = 'Color', 
              legend_field = 'Country')
     
     p.legend.location = "top_left"
@@ -359,8 +332,10 @@ def animate():
         curdoc().remove_periodic_callback(callback_id)
 
 # Make a selection of what to plot
-settings = ['Cases', 'Cases/1k Ppl', 'Deaths', 'Deaths/1k Ppl']
-radio_button = RadioButtonGroup(labels=settings, active=0)
+plot_title = ['Cases', 'Cases/1k Ppl', 'Deaths', 'Deaths/1k Ppl']
+plot_var = ['Cases_Tot', 'Cases_Per', 'Deaths_Tot', 'Deaths_Per']
+plot_min = [1, 0.0005, 1, 0.0005]
+radio_button = RadioButtonGroup(labels=plot_title, active=0)
 radio_button.on_change('active', change_var)
 
 # Make a toggle to cycle through the dates
