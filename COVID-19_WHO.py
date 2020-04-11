@@ -118,33 +118,6 @@ palette = palette[::-1]
 
 def make_map(setting, linear):
     #Instantiate LinearColorMapper that linearly maps numbers in a range, into a sequence of colors.
-    if setting == 0:
-        if linear:
-            tick_labels = {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', 
-                           '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'}
-        else:
-            tick_labels = {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k',
-                           '100000':'100k', '1000000':'1M'}
-    elif setting == 1:
-        if linear:
-            tick_labels = {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', 
-                           '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}
-        else:
-            tick_labels = {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}
-    elif setting == 2:
-        if linear:
-            tick_labels = {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', 
-                           '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'}
-        else:
-            tick_labels = {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k',
-                           '100000':'100k', '1000000':'1M'}
-    else:
-        if linear:
-            tick_labels = {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', 
-                           '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}
-        else:
-            tick_labels = {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}
-
     min_val = plot_min[setting]
     max_val = plot_max[setting]
 
@@ -152,12 +125,12 @@ def make_map(setting, linear):
         color_mapper = LinearColorMapper(palette = palette, low = 0, high = max_val)
         color_bar = ColorBar(color_mapper = color_mapper, label_standoff = 8, width = 500, height = 20, 
                              border_line_color = None, location = (0,0), orientation = 'horizontal', 
-                             major_label_overrides = tick_labels)
+                             major_label_overrides = tick_lin[setting])
     else:
         color_mapper = LogColorMapper(palette = palette, low = min_val, high = max_val)
         color_bar = ColorBar(color_mapper = color_mapper, label_standoff = 8, width = 500, height = 20, 
                              border_line_color = None, location = (0,0), orientation = 'horizontal', 
-                             ticker = LogTicker(), major_label_overrides = tick_labels)
+                             ticker = LogTicker(), major_label_overrides = tick_log[setting])
 
     #Add hover tool
     hover = HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
@@ -336,6 +309,14 @@ plot_title = ['Cases', 'Cases/1k Ppl', 'Deaths', 'Deaths/1k Ppl']
 plot_var = ['Cases_Tot', 'Cases_Per', 'Deaths_Tot', 'Deaths_Per']
 plot_min = [1, 0.0005, 1, 0.0005]
 plot_max = [max(df_map[plot_var[0]]), max(df_map[plot_var[1]]), max(df_map[plot_var[2]]), max(df_map[plot_var[3]])]
+tick_lin = [{'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
+            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'},
+            {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
+            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}]
+tick_log = [{'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
+            {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'},
+            {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
+            {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}]
 
 radio_button = RadioButtonGroup(labels=plot_title, active=0)
 radio_button.on_change('active', change_var)
