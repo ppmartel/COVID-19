@@ -18,25 +18,35 @@ import time
 ##################################################
 
 first_dt = datetime.strptime('2020-01-21',"%Y-%m-%d")
-first_rep = 1
 
 if os.path.exists('COVID-19_WHO_Cases.csv'):
     print("Database exists - Reading it")
 
-    df_cases = pd.read_csv('COVID-19_WHO_Cases.csv', encoding='utf-8', index_col='Country')
-    df_deaths = pd.read_csv('COVID-19_WHO_Deaths.csv', encoding='utf-8', index_col='Country')
+    df_cases_tot = pd.read_csv('COVID-19_WHO_Cases.csv', encoding='utf-8', index_col='Country')
+    df_deaths_tot = pd.read_csv('COVID-19_WHO_Deaths.csv', encoding='utf-8', index_col='Country')
 
-    last_dt = datetime.strptime(df_cases.columns.values[-1],'%Y-%m-%d')
-    last_rep = first_rep + int ((last_dt - first_dt).days)
+    last_dt = datetime.strptime(df_cases_tot.columns.values[-1],'%Y-%m-%d')
 else:
     print("Database does not exist")
     sys.exit()
 
+prev_dt = (last_dt - timedelta(1)).strftime("%Y-%m-%d")
 show_dt = last_dt.strftime("%Y-%m-%d")
-show_rep = last_rep
 
-df_cases.fillna(0, inplace = True)
-df_deaths.fillna(0, inplace = True)
+df_cases_tot.fillna(0, inplace = True)
+df_deaths_tot.fillna(0, inplace = True)
+
+# Make a copy within which the day to day changes are calculated
+# Probably a better way to do this, but this works for now
+df_cases_new = df_cases_tot.copy()
+df_deaths_new = df_deaths_tot.copy()
+new_dt = last_dt
+while new_dt > first_dt:
+    df_cases_new[new_dt.strftime("%Y-%m-%d")] = df_cases_new[new_dt.strftime("%Y-%m-%d")] - df_cases_new[(new_dt - timedelta(1)).strftime("%Y-%m-%d")]
+    df_deaths_new[new_dt.strftime("%Y-%m-%d")] = df_deaths_new[new_dt.strftime("%Y-%m-%d")] - df_deaths_new[(new_dt - timedelta(1)).strftime("%Y-%m-%d")]
+    new_dt = (new_dt - timedelta(1))
+df_cases_new[first_dt.strftime("%Y-%m-%d")] = 0
+df_deaths_new[first_dt.strftime("%Y-%m-%d")] = 0
 
 ##################################################
 # Plot world map using geopandas
@@ -61,17 +71,21 @@ df_geo = df_geo.explode()
 df_geo.reset_index(inplace = True)
 
 # Merge cases and deaths with map
-df_cases_map = df_geo.merge(df_cases, left_on = 'Country', right_on = 'Country', how = 'left')
-df_deaths_map = df_geo.merge(df_deaths, left_on = 'Country', right_on = 'Country', how = 'left')
+df_cases_map = df_geo.merge(df_cases_tot, left_on = 'Country', right_on = 'Country', how = 'left')
+df_deaths_map = df_geo.merge(df_deaths_tot, left_on = 'Country', right_on = 'Country', how = 'left')
 
 # Build results map
 df_map = df_geo.copy()
 df_map['Population'] = df_cases_map['Population']
-df_map['Cases_Tot'] = df_cases_map[show_dt]
-df_map['Cases_Per'] = 1000*df_cases_map[show_dt]/df_cases_map['Population']
-df_map['Deaths_Tot'] = df_deaths_map[show_dt]
-df_map['Deaths_Per'] = 1000*df_deaths_map[show_dt]/df_deaths_map['Population']
-df_map['Selected'] = df_map['Cases_Tot']
+df_map['Cases_Tot_Abs'] = df_cases_map[show_dt]
+df_map['Cases_New_Abs'] = df_cases_map[show_dt]-df_cases_map[prev_dt]
+df_map['Cases_Tot_Rel'] = 1000*df_cases_map[show_dt]/df_cases_map['Population']
+df_map['Cases_New_Rel'] = 1000*(df_cases_map[show_dt]-df_cases_map[prev_dt])/df_cases_map['Population']
+df_map['Deaths_Tot_Abs'] = df_deaths_map[show_dt]
+df_map['Deaths_New_Abs'] = df_deaths_map[show_dt]-df_deaths_map[prev_dt]
+df_map['Deaths_Tot_Rel'] = 1000*df_deaths_map[show_dt]/df_deaths_map['Population']
+df_map['Deaths_New_Rel'] = 1000*(df_deaths_map[show_dt]-df_deaths_map[prev_dt])/df_deaths_map['Population']
+df_map['Selected'] = df_map['Cases_Tot_Abs']
 
 #Read data to json.
 df_map_json = json.loads(df_map.to_json())
@@ -82,35 +96,57 @@ json_map = json.dumps(df_map_json)
 #Input GeoJSON source that contains features for plotting.
 source_map = GeoJSONDataSource(geojson = json_map)
 
-df_cases_tran = df_cases.drop(['Continental Region','Statistical Region','Population'], axis=1).T
-df_cases_tran.reset_index(inplace = True)
-df_cases_tran.rename(columns = {df_cases_tran.columns[0]:'Date'}, inplace=True)
-df_cases_tran['Date'] = pd.to_datetime(df_cases_tran['Date'])
-df_cases_tran['World'] = df_cases_tran.apply(lambda row: row[1 : -1].sum(),axis=1)
-df_cases_tran['ToolTipDate'] = df_cases_tran.Date.map(lambda x: x.strftime("%b %d"))
+df_cases_tot = df_cases_tot.drop(['Continental Region','Statistical Region','Population'], axis=1).T
+df_cases_tot.reset_index(inplace = True)
+df_cases_tot.rename(columns = {df_cases_tot.columns[0]:'Date'}, inplace=True)
+df_cases_tot['Date'] = pd.to_datetime(df_cases_tot['Date'])
+df_cases_tot['World'] = df_cases_tot.apply(lambda row: row[1 : -1].sum(),axis=1)
+df_cases_tot['ToolTipDate'] = df_cases_tot.Date.map(lambda x: x.strftime("%b %d"))
 
-df_deaths_tran = df_deaths.drop(['Continental Region','Statistical Region','Population'], axis=1).T
-df_deaths_tran.reset_index(inplace = True)
-df_deaths_tran.rename(columns = {df_deaths_tran.columns[0]:'Date'}, inplace=True)
-df_deaths_tran['Date'] = pd.to_datetime(df_deaths_tran['Date'])
-df_deaths_tran['World'] = df_deaths_tran.apply(lambda row: row[1 : -1].sum(),axis=1)
-df_deaths_tran['ToolTipDate'] = df_deaths_tran.Date.map(lambda x: x.strftime("%b %d"))
+df_cases_new = df_cases_new.drop(['Continental Region','Statistical Region','Population'], axis=1).T
+df_cases_new.reset_index(inplace = True)
+df_cases_new.rename(columns = {df_cases_new.columns[0]:'Date'}, inplace=True)
+df_cases_new['Date'] = pd.to_datetime(df_cases_new['Date'])
+df_cases_new['World'] = df_cases_new.apply(lambda row: row[1 : -1].sum(),axis=1)
+df_cases_new['ToolTipDate'] = df_cases_new.Date.map(lambda x: x.strftime("%b %d"))
 
-df_grp = df_cases_tran[['Date', 'ToolTipDate']].copy()
+df_deaths_tot = df_deaths_tot.drop(['Continental Region','Statistical Region','Population'], axis=1).T
+df_deaths_tot.reset_index(inplace = True)
+df_deaths_tot.rename(columns = {df_deaths_tot.columns[0]:'Date'}, inplace=True)
+df_deaths_tot['Date'] = pd.to_datetime(df_deaths_tot['Date'])
+df_deaths_tot['World'] = df_deaths_tot.apply(lambda row: row[1 : -1].sum(),axis=1)
+df_deaths_tot['ToolTipDate'] = df_deaths_tot.Date.map(lambda x: x.strftime("%b %d"))
+
+df_deaths_new = df_deaths_new.drop(['Continental Region','Statistical Region','Population'], axis=1).T
+df_deaths_new.reset_index(inplace = True)
+df_deaths_new.rename(columns = {df_deaths_new.columns[0]:'Date'}, inplace=True)
+df_deaths_new['Date'] = pd.to_datetime(df_deaths_new['Date'])
+df_deaths_new['World'] = df_deaths_new.apply(lambda row: row[1 : -1].sum(),axis=1)
+df_deaths_new['ToolTipDate'] = df_deaths_new.Date.map(lambda x: x.strftime("%b %d"))
+
+df_grp = df_cases_tot[['Date', 'ToolTipDate']].copy()
 df_grp['Country'] = 'World'
-df_grp['Cases_Tot'] = df_cases_tran['World']
-df_grp['Cases_Per'] = df_cases_tran['World']/7776350
-df_grp['Deaths_Tot'] = df_deaths_tran['World']
-df_grp['Deaths_Per'] = df_deaths_tran['World']/7776350
-df_grp['Selected'] = df_grp['Cases_Tot']
+df_grp['Cases_Tot_Abs'] = df_cases_tot['World']
+df_grp['Cases_New_Abs'] = df_cases_new['World']
+df_grp['Cases_Tot_Rel'] = df_cases_tot['World']/7776350
+df_grp['Cases_New_Rel'] = df_cases_new['World']/7776350
+df_grp['Deaths_Tot_Abs'] = df_deaths_tot['World']
+df_grp['Deaths_New_Abs'] = df_deaths_new['World']
+df_grp['Deaths_Tot_Rel'] = df_deaths_tot['World']/7776350
+df_grp['Deaths_New_Rel'] = df_deaths_new['World']/7776350
+df_grp['Selected'] = df_grp['Cases_Tot_Abs']
 df_grp['Color'] = Category20_16[0]
 df_grp = df_grp.sort_values(['Country', 'Date'])
 source_grp = ColumnDataSource(df_grp)
 
-sum_cases_tot = df_grp[df_grp['Date'] == show_dt]['Cases_Tot'].sum()
-sum_cases_per = df_grp[df_grp['Date'] == show_dt]['Cases_Per'].sum()
-sum_deaths_tot = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot'].sum()
-sum_deaths_per = df_grp[df_grp['Date'] == show_dt]['Deaths_Per'].sum()
+sum_cases_tot_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Abs'].sum()
+sum_cases_new_abs = df_grp[df_grp['Date'] == show_dt]['Cases_New_Abs'].sum()
+sum_cases_tot_rel = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Rel'].sum()
+sum_cases_new_rel = df_grp[df_grp['Date'] == show_dt]['Cases_New_Rel'].sum()
+sum_deaths_tot_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Abs'].sum()
+sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
+sum_deaths_tot_rel = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Rel'].sum()
+sum_deaths_new_rel = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Rel'].sum()
 
 #Define a sequential multi-hue color palette.
 palette = brewer['YlGnBu'][8]
@@ -124,22 +160,30 @@ def update_map(attr, old, new):
     show_dt = slider.value_as_date.strftime("%Y-%m-%d")
     dt_span.update(location=slider.value_as_date)
 
-    sum_cases_tot = df_grp[df_grp['Date'] == show_dt]['Cases_Tot'].sum()
-    sum_cases_per = df_grp[df_grp['Date'] == show_dt]['Cases_Per'].sum()
-    sum_deaths_tot = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot'].sum()
-    sum_deaths_per = df_grp[df_grp['Date'] == show_dt]['Deaths_Per'].sum()
+    sum_cases_tot_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Abs'].sum()
+    sum_cases_new_abs = df_grp[df_grp['Date'] == show_dt]['Cases_New_Abs'].sum()
+    sum_cases_tot_rel = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Rel'].sum()
+    sum_cases_new_rel = df_grp[df_grp['Date'] == show_dt]['Cases_New_Rel'].sum()
+    sum_deaths_tot_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Abs'].sum()
+    sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
+    sum_deaths_tot_rel = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Rel'].sum()
+    sum_deaths_new_rel = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Rel'].sum()
     source_lab.data = dict(x=[20,20,20,20,20], y=[100,80,60,40,20],
                            text=[slider.value_as_date.strftime("%d %b %Y"),
-                                 'Cases: {0}'.format(sum_cases_tot),
-                                 'Cases/1k Ppl: {0:.1e}'.format(sum_cases_per),
-                                 'Deaths: {0}'.format(sum_deaths_tot),
-                                 'Deaths/1k Ppl: {0:.1e}'.format(sum_deaths_per)])
+                                 'Cases: {0}'.format(sum_cases_tot_abs),
+                                 'Cases/1k Ppl: {0:.1e}'.format(sum_cases_tot_rel),
+                                 'Deaths: {0}'.format(sum_deaths_tot_abs),
+                                 'Deaths/1k Ppl: {0:.1e}'.format(sum_deaths_tot_rel)])
     
     df_map['Population'] = df_cases_map['Population']
-    df_map['Cases_Tot'] = df_cases_map[show_dt]
-    df_map['Cases_Per'] = 1000*df_cases_map[show_dt]/df_cases_map['Population']
-    df_map['Deaths_Tot'] = df_deaths_map[show_dt]
-    df_map['Deaths_Per'] = 1000*df_deaths_map[show_dt]/df_deaths_map['Population']
+    df_map['Cases_Tot_Abs'] = df_cases_map[show_dt]
+    df_map['Cases_New_Abs'] = df_cases_map[show_dt]-df_cases_map[prev_dt]
+    df_map['Cases_Tot_Rel'] = 1000*df_cases_map[show_dt]/df_cases_map['Population']
+    df_map['Cases_New_Rel'] = 1000*(df_cases_map[show_dt]-df_cases_map[prev_dt])/df_cases_map['Population']
+    df_map['Deaths_Tot_Abs'] = df_deaths_map[show_dt]
+    df_map['Deaths_New_Abs'] = df_deaths_map[show_dt]-df_deaths_map[prev_dt]
+    df_map['Deaths_Tot_Rel'] = 1000*df_deaths_map[show_dt]/df_deaths_map['Population']
+    df_map['Deaths_New_Rel'] = 1000*(df_deaths_map[show_dt]-df_deaths_map[prev_dt])/df_deaths_map['Population']
     df_map['Selected'] = df_map[plot_var[radio_button.active]]
     
     df_map_json = json.loads(df_map.to_json())
@@ -151,18 +195,22 @@ def update_plot(attr, old, new):
     global df_grp
     try:
         selected_index = source_map.selected.indices[0]
-        df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Cases_Tot', 'Cases_Per',
-                                       'Deaths_Tot', 'Deaths_Per', 'Selected', 'Color'])
+        df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel',
+                                       'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel', 'Selected', 'Color'])
         
         for i, selected_index in enumerate(source_map.selected.indices):
             selected_country = df_cases_map.iloc[selected_index]['Country']
             pop_country = df_cases_map.iloc[selected_index]['Population']
-            df_sel = df_cases_tran[['Date', 'ToolTipDate']].copy()
+            df_sel = df_cases_tot[['Date', 'ToolTipDate']].copy()
             df_sel['Country'] = selected_country
-            df_sel['Cases_Tot'] = df_cases_tran[selected_country]
-            df_sel['Cases_Per'] = 1000*df_cases_tran[selected_country]/pop_country
-            df_sel['Deaths_Tot'] = df_deaths_tran[selected_country]
-            df_sel['Deaths_Per'] = 1000*df_deaths_tran[selected_country]/pop_country
+            df_sel['Cases_Tot_Abs'] = df_cases_tot[selected_country]
+            df_sel['Cases_New_Abs'] = df_cases_new[selected_country]
+            df_sel['Cases_Tot_Rel'] = 1000*df_cases_tot[selected_country]/pop_country
+            df_sel['Cases_New_Rel'] = 1000*df_cases_new[selected_country]/pop_country
+            df_sel['Deaths_Tot_Abs'] = df_deaths_tot[selected_country]
+            df_sel['Deaths_New_Abs'] = df_deaths_new[selected_country]
+            df_sel['Deaths_Tot_Rel'] = 1000*df_deaths_tot[selected_country]/pop_country
+            df_sel['Deaths_New_Rel'] = 1000*df_deaths_new[selected_country]/pop_country
             df_sel['Selected'] = df_sel[plot_var[radio_button.active]]
             df_sel['Color'] = Category20_16[i]
             df_grp = df_grp.append(df_sel, ignore_index=True)
@@ -171,27 +219,35 @@ def update_plot(attr, old, new):
         source_grp.data = df_grp
 
     except IndexError:
-        df_grp = df_cases_tran[['Date', 'ToolTipDate']].copy()
+        df_grp = df_cases_tot[['Date', 'ToolTipDate']].copy()
         df_grp['Country'] = 'World'
-        df_grp['Cases_Tot'] = df_cases_tran['World']
-        df_grp['Cases_Per'] = df_cases_tran['World']/7776350
-        df_grp['Deaths_Tot'] = df_deaths_tran['World']
-        df_grp['Deaths_Per'] = df_deaths_tran['World']/7776350
+        df_grp['Cases_Tot_Abs'] = df_cases_tot['World']
+        df_grp['Cases_New_Abs'] = df_cases_new['World']
+        df_grp['Cases_Tot_Rel'] = df_cases_tot['World']/7776350
+        df_grp['Cases_New_Rel'] = df_cases_new['World']/7776350
+        df_grp['Deaths_Tot_Abs'] = df_deaths_tot['World']
+        df_grp['Deaths_New_Abs'] = df_deaths_new['World']
+        df_grp['Deaths_Tot_Rel'] = df_deaths_tot['World']/7776350
+        df_grp['Deaths_New_Rel'] = df_deaths_new['World']/7776350
         df_grp['Selected'] = df_grp[plot_var[radio_button.active]]
         df_grp['Color'] = Category20_16[0]
         df_grp = df_grp.sort_values(['Country', 'Date'])
         source_grp.data = df_grp
 
-    sum_cases_tot = df_grp[df_grp['Date'] == show_dt]['Cases_Tot'].sum()
-    sum_cases_per = df_grp[df_grp['Date'] == show_dt]['Cases_Per'].sum()
-    sum_deaths_tot = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot'].sum()
-    sum_deaths_per = df_grp[df_grp['Date'] == show_dt]['Deaths_Per'].sum()
+    sum_cases_tot_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Abs'].sum()
+    sum_cases_new_abs = df_grp[df_grp['Date'] == show_dt]['Cases_New_Abs'].sum()
+    sum_cases_tot_rel = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Rel'].sum()
+    sum_cases_new_rel = df_grp[df_grp['Date'] == show_dt]['Cases_New_Rel'].sum()
+    sum_deaths_tot_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Abs'].sum()
+    sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
+    sum_deaths_tot_rel = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Rel'].sum()
+    sum_deaths_new_rel = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Rel'].sum()
     source_lab.data = dict(x=[20,20,20,20,20], y=[100,80,60,40,20],
                            text=[slider.value_as_date.strftime("%d %b %Y"),
-                                 'Cases: {0}'.format(sum_cases_tot),
-                                 'Cases/1k Ppl: {0:.1e}'.format(sum_cases_per),
-                                 'Deaths: {0}'.format(sum_deaths_tot),
-                                 'Deaths/1k Ppl: {0:.1e}'.format(sum_deaths_per)])
+                                 'Cases: {0}'.format(sum_cases_tot_abs),
+                                 'Cases/1k Ppl: {0:.1e}'.format(sum_cases_tot_rel),
+                                 'Deaths: {0}'.format(sum_deaths_tot_abs),
+                                 'Deaths/1k Ppl: {0:.1e}'.format(sum_deaths_tot_rel)])
     
 def change_var(attr, old, new):
     fig_map.title.text = 'Map of COVID-19 '+plot_title[radio_button.active]+' (WHO)'
@@ -238,17 +294,25 @@ def animate():
         curdoc().remove_periodic_callback(callback_id)
 
 # Make a selection of what to plot
-plot_title = ['Cases', 'Cases/1k Ppl', 'Deaths', 'Deaths/1k Ppl']
-plot_var = ['Cases_Tot', 'Cases_Per', 'Deaths_Tot', 'Deaths_Per']
-plot_min = [1, 0.0005, 1, 0.0005]
-plot_max = [max(df_map[plot_var[0]]), max(df_map[plot_var[1]]), max(df_map[plot_var[2]]), max(df_map[plot_var[3]])]
+plot_title = ['Tot Cases', 'New Cases', 'Tot Cases/1k Ppl', 'New Cases/1k Ppl', 'Tot Deaths', 'New Deaths', 'Tot Deaths/1k Ppl', 'New Deaths/1k Ppl']
+plot_var = ['Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel', 'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel']
+plot_min = [1, 1, 0.0005, 0.0005, 1, 1, 0.0005, 0.0005]
+plot_max = [max(df_map[plot_var[0]]), max(df_map[plot_var[1]]), max(df_map[plot_var[2]]), max(df_map[plot_var[3]]), max(df_map[plot_var[4]]), max(df_map[plot_var[5]]), max(df_map[plot_var[6]]), max(df_map[plot_var[7]])]
 tick_lin = [{'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
+            {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
+            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'},
             {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'},
             {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
+            {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
+            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'},
             {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}]
 tick_log = [{'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
+            {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
+            {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'},
             {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'},
             {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
+            {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
+            {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'},
             {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}]
 
 radio_button = RadioButtonGroup(labels=plot_title, active=0)
@@ -277,10 +341,10 @@ source_map.selected.on_change('indices', update_plot)
 # Make a set of labels to show some totals on the map
 source_lab = ColumnDataSource(data=dict(x=[20,20,20,20,20], y=[100,80,60,40,20],
                                         text=[slider.value_as_date.strftime("%d %b %Y"),
-                                              'Cases: {0}'.format(sum_cases_tot),
-                                              'Cases/1k Ppl: {0:.1e}'.format(sum_cases_per),
-                                              'Deaths: {0}'.format(sum_deaths_tot),
-                                              'Deaths/1k Ppl: {0:.1e}'.format(sum_deaths_per)]))
+                                              'Cases: {0}'.format(sum_cases_tot_abs),
+                                              'Cases/1k Ppl: {0:.1e}'.format(sum_cases_tot_rel),
+                                              'Deaths: {0}'.format(sum_deaths_tot_abs),
+                                              'Deaths/1k Ppl: {0:.1e}'.format(sum_deaths_tot_rel)]))
 labels = LabelSet(x='x', y='y', x_units='screen', y_units='screen', text='text', source=source_lab,
                   background_fill_color='white', background_fill_alpha=1.0)
 
@@ -294,8 +358,8 @@ color_bar = ColorBar(color_mapper = log_mapper, label_standoff = 8, width = 500,
 
 #Add hover tool
 hover = HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
-                              ('Cases','@Cases_Tot (@Cases_Per/1k Ppl)'),
-                              ('Deaths','@Deaths_Tot (@Deaths_Per/1k Ppl)')])
+                              ('Cases','@Cases_Tot_Abs (@Cases_Tot_Rel/1k Ppl)'),
+                              ('Deaths','@Deaths_Tot_Abs (@Deaths_Tot_Rel/1k Ppl)')])
 
 #Create figure object.
 fig_map = figure(title = 'Map of COVID-19 '+plot_title[0]+' (WHO)', plot_height = 550 , plot_width = 950, 
@@ -333,8 +397,8 @@ fig_lin.add_layout(dt_span)
 
 # Add your tooltips
 fig_lin.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
-                                 ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per'),
-                                 ('Deaths','@Deaths_Tot'), ('Deaths/1k Ppl','@Deaths_Per')]))
+                                 ('Cases','@Cases_Tot_Abs'), ('Cases/1k Ppl','@Cases_Tot_Rel'),
+                                 ('Deaths','@Deaths_Tot_Abs'), ('Deaths/1k Ppl','@Deaths_Tot_Rel')]))
 
 #Create figure object.
 fig_log = figure(title = 'Logarithmic Plot of COVID-19 '+plot_title[0]+' (WHO)', toolbar_location = 'right',
@@ -354,8 +418,8 @@ fig_log.add_layout(dt_span)
 
 # Add your tooltips
 fig_log.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
-                                 ('Cases','@Cases_Tot'), ('Cases/1k Ppl','@Cases_Per'),
-                                 ('Deaths','@Deaths_Tot'), ('Deaths/1k Ppl','@Deaths_Per')]))
+                                 ('Cases','@Cases_Tot_Abs'), ('Cases/1k Ppl','@Cases_Tot_Rel'),
+                                 ('Deaths','@Deaths_Tot_Abs'), ('Deaths/1k Ppl','@Deaths_Tot_Rel')]))
 
 # Make a column layout of widgets and plots
 curdoc().add_root(column(radio_button, row(button, slider, lin_map), fig_map, row(fig_lin, fig_log)))
