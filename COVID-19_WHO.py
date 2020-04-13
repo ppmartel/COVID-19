@@ -184,7 +184,7 @@ def update_map(attr, old, new):
     df_map['Deaths_New_Abs'] = df_deaths_map[show_dt]-df_deaths_map[prev_dt]
     df_map['Deaths_Tot_Rel'] = 1000*df_deaths_map[show_dt]/df_deaths_map['Population']
     df_map['Deaths_New_Rel'] = 1000*(df_deaths_map[show_dt]-df_deaths_map[prev_dt])/df_deaths_map['Population']
-    df_map['Selected'] = df_map[plot_var[radio_button.active]]
+    df_map['Selected'] = df_map[plot_var[sel_var]]
     
     df_map_json = json.loads(df_map.to_json())
     json_map = json.dumps(df_map_json)
@@ -211,7 +211,7 @@ def update_plot(attr, old, new):
             df_sel['Deaths_New_Abs'] = df_deaths_new[selected_country]
             df_sel['Deaths_Tot_Rel'] = 1000*df_deaths_tot[selected_country]/pop_country
             df_sel['Deaths_New_Rel'] = 1000*df_deaths_new[selected_country]/pop_country
-            df_sel['Selected'] = df_sel[plot_var[radio_button.active]]
+            df_sel['Selected'] = df_sel[plot_var[sel_var]]
             df_sel['Color'] = Category20_16[i]
             df_grp = df_grp.append(df_sel, ignore_index=True)
             
@@ -229,7 +229,7 @@ def update_plot(attr, old, new):
         df_grp['Deaths_New_Abs'] = df_deaths_new['World']
         df_grp['Deaths_Tot_Rel'] = df_deaths_tot['World']/7776350
         df_grp['Deaths_New_Rel'] = df_deaths_new['World']/7776350
-        df_grp['Selected'] = df_grp[plot_var[radio_button.active]]
+        df_grp['Selected'] = df_grp[plot_var[sel_var]]
         df_grp['Color'] = Category20_16[0]
         df_grp = df_grp.sort_values(['Country', 'Date'])
         source_grp.data = df_grp
@@ -250,25 +250,28 @@ def update_plot(attr, old, new):
                                  'Deaths/1k Ppl: {0:.1e}'.format(sum_deaths_tot_rel)])
     
 def change_var(attr, old, new):
-    fig_map.title.text = 'Map of COVID-19 '+plot_title[radio_button.active]+' (WHO)'
-    fig_lin.title.text = 'Linear Plot of COVID-19 '+plot_title[radio_button.active]+' (WHO)'
-    fig_log.title.text = 'Logarithmic Plot of COVID-19 '+plot_title[radio_button.active]+' (WHO)'
+    global sel_var
+    sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
+
+    fig_map.title.text = 'Map of COVID-19 '+plot_title[sel_var]+' (WHO)'
+    fig_lin.title.text = 'Linear Plot of COVID-19 '+plot_title[sel_var]+' (WHO)'
+    fig_log.title.text = 'Logarithmic Plot of COVID-19 '+plot_title[sel_var]+' (WHO)'
     
     if lin_map.active:
-        lin_mapper.update(low = 0, high = plot_max[radio_button.active])
-        color_bar.update(color_mapper = lin_mapper, ticker = BasicTicker(), major_label_overrides = tick_lin[radio_button.active])
+        lin_mapper.update(low = 0, high = plot_max[sel_var])
+        color_bar.update(color_mapper = lin_mapper, ticker = BasicTicker(), major_label_overrides = tick_lin[sel_var])
         ren_map.glyph.fill_color = {'field' : 'Selected', 'transform' : lin_mapper}
     else:
-        log_mapper.update(low = plot_min[radio_button.active], high = plot_max[radio_button.active])
-        color_bar.update(color_mapper = log_mapper, ticker = LogTicker(), major_label_overrides = tick_log[radio_button.active])
+        log_mapper.update(low = plot_min[sel_var], high = plot_max[sel_var])
+        color_bar.update(color_mapper = log_mapper, ticker = LogTicker(), major_label_overrides = tick_log[sel_var])
         ren_map.glyph.fill_color = {'field' : 'Selected', 'transform' : log_mapper}
     
-    df_map['Selected'] = df_map[plot_var[radio_button.active]]
+    df_map['Selected'] = df_map[plot_var[sel_var]]
     df_map_json = json.loads(df_map.to_json())
     json_map = json.dumps(df_map_json)
     source_map.geojson = json_map
     
-    df_grp['Selected'] = df_grp[plot_var[radio_button.active]]
+    df_grp['Selected'] = df_grp[plot_var[sel_var]]
     source_grp.data = df_grp
 
 def animate_update():
@@ -294,6 +297,7 @@ def animate():
         curdoc().remove_periodic_callback(callback_id)
 
 # Make a selection of what to plot
+sel_var = 0
 plot_title = ['Tot Cases', 'New Cases', 'Tot Cases/1k Ppl', 'New Cases/1k Ppl', 'Tot Deaths', 'New Deaths', 'Tot Deaths/1k Ppl', 'New Deaths/1k Ppl']
 plot_var = ['Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel', 'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel']
 plot_min = [1, 1, 0.0005, 0.0005, 1, 1, 0.0005, 0.0005]
@@ -315,8 +319,16 @@ tick_log = [{'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '10000
             {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'},
             {'0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}]
 
-radio_button = RadioButtonGroup(labels=plot_title, active=0)
-radio_button.on_change('active', change_var)
+rb_cases_deaths = RadioButtonGroup(labels=['Cases', 'Deaths'], active=0)
+rb_cases_deaths.on_change('active', change_var)
+
+rb_abs_rel = RadioButtonGroup(labels=['Per Region', 'Per 1k Ppl'], active=0)
+rb_abs_rel.on_change('active', change_var)
+
+rb_tot_new = RadioButtonGroup(labels=['Total', 'New'], active=0)
+rb_tot_new.on_change('active', change_var)
+
+sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
 
 # Make a toggle to cycle through the dates
 button = Button(label='► Play', width=90, margin = (20, 0, 0, 10))
@@ -422,4 +434,4 @@ fig_log.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@
                                  ('Deaths','@Deaths_Tot_Abs'), ('Deaths/1k Ppl','@Deaths_Tot_Rel')]))
 
 # Make a column layout of widgets and plots
-curdoc().add_root(column(radio_button, row(button, slider, lin_map), fig_map, row(fig_lin, fig_log)))
+curdoc().add_root(column(row(rb_cases_deaths, rb_abs_rel, rb_tot_new), row(button, slider, lin_map), fig_map, row(fig_lin, fig_log)))
