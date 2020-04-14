@@ -154,6 +154,92 @@ palette = brewer['YlGnBu'][8]
 #Reverse color order so that dark blue is highest obesity.
 palette = palette[::-1]
 
+# Make the map
+def make_map():
+    #Create figure object.
+    p = figure(title = 'Map of COVID-19 '+plot_title[sel_var]+' (WHO)', plot_height = 550 , plot_width = 950, 
+                     x_range=(-180, 180), y_range=(-65, 90), toolbar_location = 'right',
+                     tools = 'pan, wheel_zoom, box_zoom, reset, tap')
+    p.xgrid.grid_line_color = None
+    p.ygrid.grid_line_color = None
+    
+    p.add_layout(labels)
+    
+    #Instantiate ColorMapper that maps numbers in a range, into a sequence of colors
+    if lin_map.active:
+        mapper = LinearColorMapper(palette = palette, low = 0, high = plot_max[sel_var])
+        color_bar = ColorBar(color_mapper = mapper, label_standoff = 8, width = 500, height = 20, 
+                             border_line_color = None, location = (0,0), orientation = 'horizontal', 
+                             ticker = BasicTicker(), major_label_overrides = tick_lin[sel_var])
+    else:
+        mapper = LogColorMapper(palette = palette, low = plot_min[sel_var], high = plot_max[sel_var])
+        color_bar = ColorBar(color_mapper = mapper, label_standoff = 8, width = 500, height = 20, 
+                             border_line_color = None, location = (0,0), orientation = 'horizontal', 
+                             ticker = LogTicker(), major_label_overrides = tick_log[sel_var])
+    
+    #Add patch renderer to figure. 
+    ren_map = p.patches('xs', 'ys', source = source_map, line_color = 'black', line_width = 0.25,
+                        fill_color = {'field' : 'Selected', 'transform' : mapper}, fill_alpha = 1)
+
+    #Specify figure layout.
+    p.add_layout(color_bar, 'below')
+    
+    #Add hover tool
+    p.add_tools(HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
+                                  ('Cases','@Cases_Tot_Abs (@Cases_Tot_Rel/1k Ppl)'),
+                                  ('Deaths','@Deaths_Tot_Abs (@Deaths_Tot_Rel/1k Ppl)')]))
+
+    return p
+
+# Make linear plot
+def make_lin():
+    #Create figure object.
+    p = figure(title = 'Linear Plot of COVID-19 '+plot_title[sel_var]+' (WHO)', toolbar_location = 'right',
+               plot_height = 375, plot_width = 475, x_axis_type = 'datetime', 
+               tools = 'pan, wheel_zoom, box_zoom, reset')
+
+    # Format your x-axis as datetime.
+    p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
+    p.yaxis[0].formatter = PrintfTickFormatter(format='%.1e')
+
+    p.circle(x = 'Date', y = 'Selected', source=source_grp, fill_color = 'Color', line_color = 'Color', 
+             legend_field = 'Country')
+
+    p.legend.location = "top_left"
+    p.legend.click_policy="mute"
+
+    p.add_layout(dt_span)
+
+    # Add your tooltips
+    p.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
+                                     ('Cases','@Cases_Tot_Abs'), ('Cases/1k Ppl','@Cases_Tot_Rel'),
+                                     ('Deaths','@Deaths_Tot_Abs'), ('Deaths/1k Ppl','@Deaths_Tot_Rel')]))
+    return p
+
+# Make logarithmic plot
+def make_log():
+    #Create figure object.
+    p = figure(title = 'Logarithmic Plot of COVID-19 '+plot_title[sel_var]+' (WHO)',toolbar_location = 'right',
+               plot_height = 375, plot_width = 475, x_axis_type = 'datetime', y_axis_type = 'log', 
+               tools = 'pan, wheel_zoom, box_zoom, reset')
+
+    # Format your x-axis as datetime.
+    p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
+
+    p.circle(x = 'Date', y = 'Selected', source=source_grp, fill_color = 'Color', line_color = 'Color', 
+             legend_field = 'Country')
+
+    p.legend.location = "top_left"
+    p.legend.click_policy="mute"
+
+    p.add_layout(dt_span)
+    
+    # Add your tooltips
+    p.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
+                                     ('Cases','@Cases_Tot_Abs'), ('Cases/1k Ppl','@Cases_Tot_Rel'),
+                                     ('Deaths','@Deaths_Tot_Abs'), ('Deaths/1k Ppl','@Deaths_Tot_Rel')]))
+    return p
+    
 # Define the callback function: update_map
 def update_map(attr, old, new):
     global show_dt
@@ -250,21 +336,10 @@ def update_plot(attr, old, new):
                                  'Deaths/1k Ppl: {0:.1e}'.format(sum_deaths_tot_rel)])
     
 def change_var(attr, old, new):
+    curdoc().clear()
+    
     global sel_var
     sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
-
-    fig_map.title.text = 'Map of COVID-19 '+plot_title[sel_var]+' (WHO)'
-    fig_lin.title.text = 'Linear Plot of COVID-19 '+plot_title[sel_var]+' (WHO)'
-    fig_log.title.text = 'Logarithmic Plot of COVID-19 '+plot_title[sel_var]+' (WHO)'
-    
-    if lin_map.active:
-        lin_mapper.update(low = 0, high = plot_max[sel_var])
-        color_bar.update(color_mapper = lin_mapper, ticker = BasicTicker(), major_label_overrides = tick_lin[sel_var])
-        ren_map.glyph.fill_color = {'field' : 'Selected', 'transform' : lin_mapper}
-    else:
-        log_mapper.update(low = plot_min[sel_var], high = plot_max[sel_var])
-        color_bar.update(color_mapper = log_mapper, ticker = LogTicker(), major_label_overrides = tick_log[sel_var])
-        ren_map.glyph.fill_color = {'field' : 'Selected', 'transform' : log_mapper}
     
     df_map['Selected'] = df_map[plot_var[sel_var]]
     df_map_json = json.loads(df_map.to_json())
@@ -273,6 +348,8 @@ def change_var(attr, old, new):
     
     df_grp['Selected'] = df_grp[plot_var[sel_var]]
     source_grp.data = df_grp
+
+    curdoc().add_root(column(row(rb_cases_deaths, rb_abs_rel, rb_tot_new), row(button, slider, lin_map), make_map(), row(make_lin(), make_log())))
 
 def animate_update():
     global show_dt
@@ -297,7 +374,6 @@ def animate():
         curdoc().remove_periodic_callback(callback_id)
 
 # Make a selection of what to plot
-sel_var = 0
 plot_title = ['Tot Cases', 'New Cases', 'Tot Cases/1k Ppl', 'New Cases/1k Ppl', 'Tot Deaths', 'New Deaths', 'Tot Deaths/1k Ppl', 'New Deaths/1k Ppl']
 plot_var = ['Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel', 'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel']
 plot_min = [1, 1, 0.0005, 0.0005, 1, 1, 0.0005, 0.0005]
@@ -360,78 +436,5 @@ source_lab = ColumnDataSource(data=dict(x=[20,20,20,20,20], y=[100,80,60,40,20],
 labels = LabelSet(x='x', y='y', x_units='screen', y_units='screen', text='text', source=source_lab,
                   background_fill_color='white', background_fill_alpha=1.0)
 
-# Make the map
-#Instantiate LinearColorMapper that linearly maps numbers in a range, into a sequence of colors
-lin_mapper = LinearColorMapper(palette = palette, low = 0, high = plot_max[0])
-log_mapper = LogColorMapper(palette = palette, low = plot_min[0], high = plot_max[0])
-color_bar = ColorBar(color_mapper = log_mapper, label_standoff = 8, width = 500, height = 20, 
-                     border_line_color = None, location = (0,0), orientation = 'horizontal', 
-                     ticker = LogTicker(), major_label_overrides = tick_log[0])
-
-#Add hover tool
-hover = HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
-                              ('Cases','@Cases_Tot_Abs (@Cases_Tot_Rel/1k Ppl)'),
-                              ('Deaths','@Deaths_Tot_Abs (@Deaths_Tot_Rel/1k Ppl)')])
-
-#Create figure object.
-fig_map = figure(title = 'Map of COVID-19 '+plot_title[0]+' (WHO)', plot_height = 550 , plot_width = 950, 
-                 x_range=(-180, 180), y_range=(-65, 90), toolbar_location = 'right',
-                 tools = 'pan, wheel_zoom, box_zoom, reset, tap')
-fig_map.xgrid.grid_line_color = None
-fig_map.ygrid.grid_line_color = None
-
-fig_map.add_layout(labels)
-
-#Add patch renderer to figure. 
-ren_map = fig_map.patches('xs', 'ys', source = source_map, fill_color = {'field' : 'Selected', 'transform' : log_mapper},
-                          line_color = 'black', line_width = 0.25, fill_alpha = 1)
-
-#Specify figure layout.
-fig_map.add_layout(color_bar, 'below')
-fig_map.add_tools(hover)
-
-#Create figure object.
-fig_lin = figure(title = 'Linear Plot of COVID-19 '+plot_title[0]+' (WHO)', toolbar_location = 'right',
-                 plot_height = 375, plot_width = 475, x_axis_type = 'datetime', 
-                 tools = 'pan, wheel_zoom, box_zoom, reset')
-
-# Format your x-axis as datetime.
-fig_lin.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
-fig_lin.yaxis[0].formatter = PrintfTickFormatter(format='%.1e')
-
-fig_lin.circle(x = 'Date', y = 'Selected', source=source_grp, fill_color = 'Color', line_color = 'Color', 
-         legend_field = 'Country')
-
-fig_lin.legend.location = "top_left"
-fig_lin.legend.click_policy="mute"
-
-fig_lin.add_layout(dt_span)
-
-# Add your tooltips
-fig_lin.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
-                                 ('Cases','@Cases_Tot_Abs'), ('Cases/1k Ppl','@Cases_Tot_Rel'),
-                                 ('Deaths','@Deaths_Tot_Abs'), ('Deaths/1k Ppl','@Deaths_Tot_Rel')]))
-
-#Create figure object.
-fig_log = figure(title = 'Logarithmic Plot of COVID-19 '+plot_title[0]+' (WHO)', toolbar_location = 'right',
-           plot_height = 375, plot_width = 475, x_axis_type = 'datetime', y_axis_type = 'log', 
-           tools = 'pan, wheel_zoom, box_zoom, reset')
-
-# Format your x-axis as datetime.
-fig_log.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
-
-fig_log.circle(x = 'Date', y = 'Selected', source=source_grp, fill_color = 'Color', line_color = 'Color', 
-         legend_field = 'Country')
-
-fig_log.legend.location = "top_left"
-fig_log.legend.click_policy="mute"
-
-fig_log.add_layout(dt_span)
-
-# Add your tooltips
-fig_log.add_tools(HoverTool(tooltips= [('Country/region','@Country'), ('Date','@ToolTipDate'), 
-                                 ('Cases','@Cases_Tot_Abs'), ('Cases/1k Ppl','@Cases_Tot_Rel'),
-                                 ('Deaths','@Deaths_Tot_Abs'), ('Deaths/1k Ppl','@Deaths_Tot_Rel')]))
-
 # Make a column layout of widgets and plots
-curdoc().add_root(column(row(rb_cases_deaths, rb_abs_rel, rb_tot_new), row(button, slider, lin_map), fig_map, row(fig_lin, fig_log)))
+curdoc().add_root(column(row(rb_cases_deaths, rb_abs_rel, rb_tot_new), row(button, slider, lin_map), make_map(), row(make_lin(), make_log())))
