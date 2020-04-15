@@ -2,7 +2,7 @@ from bokeh.io import curdoc, output_notebook, show, output_file
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, LogColorMapper, ColorBar
 from bokeh.models import Label, LabelSet, HoverTool, TapTool, RadioButtonGroup, Button, DateSlider, Span
-from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, BasicTicker, LogTicker, Toggle
+from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, BasicTicker, LogTicker, Toggle, CustomJSHover
 from bokeh.palettes import brewer, Category20_16
 from bokeh.layouts import row, column
 from datetime import timedelta, date, datetime
@@ -140,14 +140,15 @@ df_grp['Color'] = Category20_16[0]
 df_grp = df_grp.sort_values(['Country', 'Date'])
 source_grp = ColumnDataSource(df_grp)
 
+sum_population = df_grp[df_grp['Date'] == show_dt]['Population'].sum()
 sum_cases_tot_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Abs'].sum()
 sum_cases_new_abs = df_grp[df_grp['Date'] == show_dt]['Cases_New_Abs'].sum()
-sum_cases_tot_rel = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Rel'].sum()
-sum_cases_new_rel = df_grp[df_grp['Date'] == show_dt]['Cases_New_Rel'].sum()
+sum_cases_tot_rel = 1000*sum_cases_tot_abs/sum_population
+sum_cases_new_rel = 1000*sum_cases_new_abs/sum_population
 sum_deaths_tot_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Abs'].sum()
 sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
-sum_deaths_tot_rel = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Rel'].sum()
-sum_deaths_new_rel = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Rel'].sum()
+sum_deaths_tot_rel = 1000*sum_deaths_tot_abs/sum_population
+sum_deaths_new_rel = 1000*sum_deaths_new_abs/sum_population
 
 #Define a sequential multi-hue color palette.
 palette = brewer['YlGnBu'][9]
@@ -155,9 +156,35 @@ palette = brewer['YlGnBu'][9]
 #Reverse color order so that dark blue is highest obesity.
 palette = palette[::-1]
 
+custom=CustomJSHover(code="""
+                     if (value==0) {
+                         return ""
+                     }
+                     var modified;
+                     var SI_SYMBOL = ["", "k", "M", "G", "T", "P", "E"];
+                     modified = 1000/value;
+                     
+                     // what tier? (determines SI symbol)
+                     var tier = Math.log10(modified) / 3 | 0;
+                     
+                     // if zero, we don't need a suffix
+                     if(tier == 0) return "(1/" + modified.toFixed(0) + " Ppl)";
+                     
+                     // get suffix and determine scale
+                     var suffix = SI_SYMBOL[tier];
+                     var scale = Math.pow(10, tier * 3);
+                     
+                     // scale the number
+                     var scaled = modified / scale;
+                     
+                     // format number and add suffix
+                     return "(1/" + scaled.toFixed(1) + suffix + " Ppl)";
+                     """)
+
 hover = HoverTool(tooltips= [('Date','@ToolTipDate'),
-                             ('Country/region','@Country'), ('Population','@Population'), 
-                             ('Tot Cases','@Cases_Tot_Abs (@Cases_Tot_Rel/1k Ppl)')], mode = 'vline')
+                             ('Country/region','@Country'), ('Population','@Population'),
+                             ('Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}')],
+                  formatters={'@Cases_Tot_Rel' : custom}, mode = 'vline')
 
 # Make the map
 def make_map():
@@ -191,11 +218,12 @@ def make_map():
     
     #Add hover tool
     p.add_tools(HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
-                                      ('Tot Cases','@Cases_Tot_Abs (@Cases_Tot_Rel/1k Ppl)'),
-                                      ('New Cases','@Cases_New_Abs (@Cases_New_Rel/1k Ppl)'),
-                                      ('Tot Deaths','@Deaths_Tot_Abs (@Deaths_Tot_Rel/1k Ppl)'),
-                                      ('New Deaths','@Deaths_New_Abs (@Deaths_New_Rel/1k Ppl)')]))
-
+                                      ('Tot Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}'),
+                                      ('New Cases','@Cases_New_Abs @Cases_New_Rel{custom}'),
+                                      ('Tot Deaths','@Deaths_Tot_Abs @Deaths_Tot_Rel{custom}'),
+                                      ('New Deaths','@Deaths_New_Abs @Deaths_New_Rel{custom}')],
+                          formatters={'@Cases_Tot_Rel' : custom, '@Cases_New_Rel' : custom,
+                                      '@Deaths_Tot_Rel' : custom, '@Deaths_New_Rel' : custom}))
     return p
 
 # Make linear plot
@@ -219,12 +247,6 @@ def make_lin():
 
     # Add your tooltips
     p.add_tools(hover)
-    #p.add_tools(HoverTool(tooltips= [('Date','@ToolTipDate'),
-    #                                 ('Country/region','@Country'), ('Population','@Population'), 
-    #                                 ('Tot Cases','@Cases_Tot_Abs (@Cases_Tot_Rel/1k Ppl)'),
-    #                                 ('New Cases','@Cases_New_Abs (@Cases_New_Rel/1k Ppl)'),
-    #                                 ('Tot Deaths','@Deaths_Tot_Abs (@Deaths_Tot_Rel/1k Ppl)'),
-    #                                 ('New Deaths','@Deaths_New_Abs (@Deaths_New_Rel/1k Ppl)')]))
     return p
 
 # Make logarithmic plot
@@ -247,12 +269,6 @@ def make_log():
     
     # Add your tooltips
     p.add_tools(hover)
-    #p.add_tools(HoverTool(tooltips = [('Date','@ToolTipDate'),
-    #                                  ('Country/region','@Country'), ('Population','@Population'), 
-    #                                  ('Tot Cases','@Cases_Tot_Abs (@Cases_Tot_Rel/1k Ppl)'),
-    #                                  ('New Cases','@Cases_New_Abs (@Cases_New_Rel/1k Ppl)'),
-    #                                  ('Tot Deaths','@Deaths_Tot_Abs (@Deaths_Tot_Rel/1k Ppl)'),
-    #                                  ('New Deaths','@Deaths_New_Abs (@Deaths_New_Rel/1k Ppl)')]))
     return p
     
 # Define the callback function: update_map
@@ -261,14 +277,15 @@ def update_map(attr, old, new):
     show_dt = slider.value_as_date.strftime("%Y-%m-%d")
     dt_span.update(location=slider.value_as_date)
 
+    sum_population = df_grp[df_grp['Date'] == show_dt]['Population'].sum()
     sum_cases_tot_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Abs'].sum()
     sum_cases_new_abs = df_grp[df_grp['Date'] == show_dt]['Cases_New_Abs'].sum()
-    sum_cases_tot_rel = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Rel'].sum()
-    sum_cases_new_rel = df_grp[df_grp['Date'] == show_dt]['Cases_New_Rel'].sum()
+    sum_cases_tot_rel = 1000*sum_cases_tot_abs/sum_population
+    sum_cases_new_rel = 1000*sum_cases_new_abs/sum_population
     sum_deaths_tot_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Abs'].sum()
     sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
-    sum_deaths_tot_rel = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Rel'].sum()
-    sum_deaths_new_rel = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Rel'].sum()
+    sum_deaths_tot_rel = 1000*sum_deaths_tot_abs/sum_population
+    sum_deaths_new_rel = 1000*sum_deaths_new_abs/sum_population
 
     if sum_cases_tot_abs > 0:
         txt_cases_tot = 'Tot Cases: {0} (1/{1:.0f} Ppl)'.format(sum_cases_tot_abs, 1000/sum_cases_tot_rel)
@@ -301,7 +318,7 @@ def update_map(attr, old, new):
     df_map['Deaths_Tot_Rel'] = 1000*df_deaths_map[show_dt]/df_deaths_map['Population']
     df_map['Deaths_New_Rel'] = 1000*(df_deaths_map[show_dt]-df_deaths_map[prev_dt])/df_deaths_map['Population']
     df_map['Selected'] = df_map[plot_var[sel_var]]
-    
+
     df_map_json = json.loads(df_map.to_json())
     json_map = json.dumps(df_map_json)
     source_map.geojson = json_map
@@ -311,8 +328,9 @@ def update_plot(attr, old, new):
     global df_grp
     try:
         selected_index = source_map.selected.indices[0]
-        df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Population', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel',
-                                       'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel', 'Selected', 'Color'])
+        df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Population', 'Selected', 'Color',
+                                       'Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel',
+                                       'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel'])
         
         for i, selected_index in enumerate(source_map.selected.indices):
             selected_country = df_cases_map.iloc[selected_index]['Country']
@@ -352,14 +370,15 @@ def update_plot(attr, old, new):
         df_grp = df_grp.sort_values(['Country', 'Date'])
         source_grp.data = df_grp
 
+    sum_population = df_grp[df_grp['Date'] == show_dt]['Population'].sum()
     sum_cases_tot_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Abs'].sum()
     sum_cases_new_abs = df_grp[df_grp['Date'] == show_dt]['Cases_New_Abs'].sum()
-    sum_cases_tot_rel = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Rel'].sum()
-    sum_cases_new_rel = df_grp[df_grp['Date'] == show_dt]['Cases_New_Rel'].sum()
+    sum_cases_tot_rel = 1000*sum_cases_tot_abs/sum_population
+    sum_cases_new_rel = 1000*sum_cases_new_abs/sum_population
     sum_deaths_tot_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Abs'].sum()
     sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
-    sum_deaths_tot_rel = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Rel'].sum()
-    sum_deaths_new_rel = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Rel'].sum()
+    sum_deaths_tot_rel = 1000*sum_deaths_tot_abs/sum_population
+    sum_deaths_new_rel = 1000*sum_deaths_tot_abs/sum_population
 
     if sum_cases_tot_abs > 0:
         txt_cases_tot = 'Tot Cases: {0} (1/{1:.0f} Ppl)'.format(sum_cases_tot_abs, 1000/sum_cases_tot_rel)
@@ -397,17 +416,22 @@ def change_var(attr, old, new):
     source_grp.data = df_grp
 
     if rb_cases_deaths.active and rb_tot_new.active:
-        hover.tooltips = [('Country/region','@Country'), ('Population','@Population'), 
-                          ('New Deaths','@Deaths_New_Abs (@Deaths_New_Rel/1k Ppl)')]
+        hover.tooltips = [('Date','@ToolTipDate'), ('Country/region','@Country'), ('Population','@Population')
+                          ('New Deaths','@Deaths_New_Abs @Deaths_New_Rel{custom}')]
+        hover.formatters = {'@Deaths_New_Rel' : custom}
+
     elif rb_cases_deaths.active:
-        hover.tooltips = [('Country/region','@Country'), ('Population','@Population'), 
-                          ('Tot Deaths','@Deaths_Tot_Abs (@Deaths_Tot_Rel/1k Ppl)')]
+        hover.tooltips = [('Date','@ToolTipDate'), ('Country/region','@Country'), ('Population','@Population')
+                          ('Tot Deaths','@Deaths_Tot_Abs @Deaths_Tot_Rel{custom}')]
+        hover.formatters = {'@Deaths_Tot_Rel' : custom}
     elif rb_tot_new.active:
-        hover.tooltips = [('Country/region','@Country'), ('Population','@Population'), 
-                          ('New Cases','@Cases_New_Abs (@Cases_New_Rel/1k Ppl)')]
+        hover.tooltips = [('Date','@ToolTipDate'), ('Country/region','@Country'), ('Population','@Population')
+                          ('New Cases','@Cases_New_Abs @Cases_New_Rel{custom}')]
+        hover.formatters = {'@Cases_New_Rel' : custom}
     else:
-        hover.tooltips = [('Country/region','@Country'), ('Population','@Population'), 
-                          ('Tot Cases','@Cases_Tot_Abs (@Cases_Tot_Rel/1k Ppl)')]
+        hover.tooltips = [('Date','@ToolTipDate'), ('Country/region','@Country'), ('Population','@Population')
+                          ('Tot Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}')]
+        hover.formatters = {'@Cases_Tot_Rel' : custom}
 
     curdoc().add_root(column(row(rb_cases_deaths, rb_abs_rel, rb_tot_new), row(button, slider, lin_map), make_map(), row(make_lin(), make_log())))
 
@@ -498,3 +522,4 @@ labels = LabelSet(x='x', y='y', x_units='screen', y_units='screen', text='text',
 
 # Make a column layout of widgets and plots
 curdoc().add_root(column(row(rb_cases_deaths, rb_abs_rel, rb_tot_new), row(button, slider, lin_map), make_map(), row(make_lin(), make_log())))
+
