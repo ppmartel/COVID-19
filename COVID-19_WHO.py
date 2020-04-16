@@ -1,8 +1,8 @@
 from bokeh.io import curdoc, output_notebook, show, output_file
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, LogColorMapper, ColorBar
-from bokeh.models import Label, LabelSet, HoverTool, TapTool, RadioButtonGroup, Button, DateSlider, Span
-from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, BasicTicker, LogTicker, Toggle, CustomJSHover
+from bokeh.models import LabelSet, HoverTool, TapTool, RadioButtonGroup, Button, DateSlider, Span, Toggle
+from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, BasicTicker, LogTicker, CustomJSHover
 from bokeh.palettes import brewer, Category20_16
 from bokeh.layouts import row, column
 from datetime import timedelta, date, datetime
@@ -42,8 +42,10 @@ df_cases_new = df_cases_tot.copy()
 df_deaths_new = df_deaths_tot.copy()
 new_dt = last_dt
 while new_dt > first_dt:
-    df_cases_new[new_dt.strftime("%Y-%m-%d")] = df_cases_new[new_dt.strftime("%Y-%m-%d")] - df_cases_new[(new_dt - timedelta(1)).strftime("%Y-%m-%d")]
-    df_deaths_new[new_dt.strftime("%Y-%m-%d")] = df_deaths_new[new_dt.strftime("%Y-%m-%d")] - df_deaths_new[(new_dt - timedelta(1)).strftime("%Y-%m-%d")]
+    df_cases_new[new_dt.strftime("%Y-%m-%d")] = (df_cases_new[new_dt.strftime("%Y-%m-%d")] -
+                                                 df_cases_new[(new_dt - timedelta(1)).strftime("%Y-%m-%d")])
+    df_deaths_new[new_dt.strftime("%Y-%m-%d")] = (df_deaths_new[new_dt.strftime("%Y-%m-%d")] -
+                                                  df_deaths_new[(new_dt - timedelta(1)).strftime("%Y-%m-%d")])
     new_dt = (new_dt - timedelta(1))
 df_cases_new[first_dt.strftime("%Y-%m-%d")] = 0
 df_deaths_new[first_dt.strftime("%Y-%m-%d")] = 0
@@ -328,28 +330,45 @@ def update_plot(attr, old, new):
     global df_grp
     try:
         selected_index = source_map.selected.indices[0]
+        old_list = source_map.selected.indices
+        old_list.sort()
+        new_list = []
+        for i,  selected_index in enumerate(source_map.selected.indices):
+            new_list = new_list + list(df_cases_map['Country'][df_cases_map['Country'] == df_cases_map.iloc[selected_index]['Country']].index)
+
+        new_list = list(set(new_list))
+        new_list.sort()
+        if new_list != old_list:
+            source_map.selected.update(indices = new_list)
+            return
+        
         df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Population', 'Selected', 'Color',
                                        'Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel',
                                        'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel'])
-        
+
+        color_index = 0
+        prev_country = 'World'
         for i, selected_index in enumerate(source_map.selected.indices):
             selected_country = df_cases_map.iloc[selected_index]['Country']
-            pop_country = df_cases_map.iloc[selected_index]['Population']
-            df_sel = df_cases_tot[['Date', 'ToolTipDate']].copy()
-            df_sel['Country'] = selected_country
-            df_sel['Population'] = pop_country
-            df_sel['Cases_Tot_Abs'] = df_cases_tot[selected_country]
-            df_sel['Cases_New_Abs'] = df_cases_new[selected_country]
-            df_sel['Cases_Tot_Rel'] = 1000*df_cases_tot[selected_country]/pop_country
-            df_sel['Cases_New_Rel'] = 1000*df_cases_new[selected_country]/pop_country
-            df_sel['Deaths_Tot_Abs'] = df_deaths_tot[selected_country]
-            df_sel['Deaths_New_Abs'] = df_deaths_new[selected_country]
-            df_sel['Deaths_Tot_Rel'] = 1000*df_deaths_tot[selected_country]/pop_country
-            df_sel['Deaths_New_Rel'] = 1000*df_deaths_new[selected_country]/pop_country
-            df_sel['Selected'] = df_sel[plot_var[sel_var]]
-            df_sel['Color'] = Category20_16[i]
-            df_grp = df_grp.append(df_sel, ignore_index=True)
-            
+            if selected_country != prev_country:
+                prev_country = selected_country
+                pop_country = df_cases_map.iloc[selected_index]['Population']
+                df_sel = df_cases_tot[['Date', 'ToolTipDate']].copy()
+                df_sel['Country'] = selected_country
+                df_sel['Population'] = pop_country
+                df_sel['Cases_Tot_Abs'] = df_cases_tot[selected_country]
+                df_sel['Cases_New_Abs'] = df_cases_new[selected_country]
+                df_sel['Cases_Tot_Rel'] = 1000*df_cases_tot[selected_country]/pop_country
+                df_sel['Cases_New_Rel'] = 1000*df_cases_new[selected_country]/pop_country
+                df_sel['Deaths_Tot_Abs'] = df_deaths_tot[selected_country]
+                df_sel['Deaths_New_Abs'] = df_deaths_new[selected_country]
+                df_sel['Deaths_Tot_Rel'] = 1000*df_deaths_tot[selected_country]/pop_country
+                df_sel['Deaths_New_Rel'] = 1000*df_deaths_new[selected_country]/pop_country
+                df_sel['Selected'] = df_sel[plot_var[sel_var]]
+                df_sel['Color'] = Category20_16[color_index]
+                color_index = color_index + 1
+                df_grp = df_grp.append(df_sel, ignore_index=True)
+                        
         df_grp = df_grp.sort_values(['Country', 'Date'])
         source_grp.data = df_grp
 
@@ -433,7 +452,8 @@ def change_var(attr, old, new):
                           ('Tot Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}')]
         hover.formatters = {'@Cases_Tot_Rel' : custom}
 
-    curdoc().add_root(column(row(rb_cases_deaths, rb_abs_rel, rb_tot_new), row(button, slider, lin_map), make_map(), row(make_lin(), make_log())))
+    curdoc().add_root(column(row(rb_cases_deaths, rb_abs_rel, rb_tot_new), row(button, slider, lin_map),
+                             make_map(), row(make_lin(), make_log())))
 
 def animate_update():
     global show_dt
@@ -458,26 +478,42 @@ def animate():
         curdoc().remove_periodic_callback(callback_id)
 
 # Make a selection of what to plot
-plot_title = ['Tot Cases', 'New Cases', 'Tot Cases/1k Ppl', 'New Cases/1k Ppl', 'Tot Deaths', 'New Deaths', 'Tot Deaths/1k Ppl', 'New Deaths/1k Ppl']
-plot_var = ['Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel', 'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel']
+plot_title = ['Tot Cases', 'New Cases', 'Tot Cases/1k Ppl', 'New Cases/1k Ppl',
+              'Tot Deaths', 'New Deaths', 'Tot Deaths/1k Ppl', 'New Deaths/1k Ppl']
+plot_var = ['Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel',
+            'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel']
 plot_min = [1, 1, 0.0005, 0.0005, 1, 1, 0.0005, 0.00001]
-plot_max = [max(df_map[plot_var[0]]), max(df_map[plot_var[1]]), max(df_map[plot_var[2]]), max(df_map[plot_var[3]]), max(df_map[plot_var[4]]), max(df_map[plot_var[5]]), max(df_map[plot_var[6]]), max(df_map[plot_var[7]])]
-tick_lin = [{'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
-            {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
-            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'},
-            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'},
-            {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
-            {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k', '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
-            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'},
-            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333', '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}]
+plot_max = [max(df_map[plot_var[0]]), max(df_map[plot_var[1]]), max(df_map[plot_var[2]]),
+            max(df_map[plot_var[3]]), max(df_map[plot_var[4]]), max(df_map[plot_var[5]]),
+            max(df_map[plot_var[6]]), max(df_map[plot_var[7]])]
+tick_lin = [{'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k',
+             '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
+            {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k',
+             '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
+            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333',
+             '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'},
+            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333',
+             '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'},
+            {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k',
+             '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
+            {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k',
+             '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
+            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333',
+             '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'},
+            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333',
+             '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}]
 tick_log = [{'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
             {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
-            {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'},
-            {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'},
+            {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k',
+             '1':'1/1k', '10':'1/100', '100':'1/10'},
+            {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k',
+             '1':'1/1k', '10':'1/100', '100':'1/10'},
             {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
             {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
-            {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'},
-            {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k', '1':'1/1k', '10':'1/100', '100':'1/10'}]
+            {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k',
+             '1':'1/1k', '10':'1/100', '100':'1/10'},
+            {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k',
+             '1':'1/1k', '10':'1/100', '100':'1/10'}]
 
 rb_cases_deaths = RadioButtonGroup(labels=['Cases', 'Deaths'], active=0)
 rb_cases_deaths.on_change('active', change_var)
@@ -513,13 +549,17 @@ source_map.selected.on_change('indices', update_plot)
 # Make a set of labels to show some totals on the map
 source_lab = ColumnDataSource(data=dict(x=[20,20,20,20,20], y=[100,80,60,40,20],
                                         text=[slider.value_as_date.strftime("%d %b %Y"),
-                                              'Tot Cases: {0} (1/{1:.0f} Ppl)'.format(sum_cases_tot_abs, 1000/sum_cases_tot_rel),
-                                              'New Cases: {0} (1/{1:.0f} Ppl)'.format(sum_cases_new_abs, 1000/sum_cases_new_rel),
-                                              'Tot Deaths: {0} (1/{1:.0f} Ppl)'.format(sum_deaths_tot_abs, 1000/sum_deaths_tot_rel),
-                                              'New Deaths: {0} (1/{1:.0f} Ppl)'.format(sum_deaths_new_abs, 1000/sum_deaths_new_rel)]))
+                                        'Tot Cases: {0} (1/{1:.0f} Ppl)'.format(sum_cases_tot_abs,
+                                                                                1000/sum_cases_tot_rel),
+                                        'New Cases: {0} (1/{1:.0f} Ppl)'.format(sum_cases_new_abs,
+                                                                                1000/sum_cases_new_rel),
+                                        'Tot Deaths: {0} (1/{1:.0f} Ppl)'.format(sum_deaths_tot_abs,
+                                                                                 1000/sum_deaths_tot_rel),
+                                        'New Deaths: {0} (1/{1:.0f} Ppl)'.format(sum_deaths_new_abs,
+                                                                                 1000/sum_deaths_new_rel)]))
 labels = LabelSet(x='x', y='y', x_units='screen', y_units='screen', text='text', source=source_lab,
                   text_font_size='10pt', background_fill_color='white', background_fill_alpha=1.0)
 
 # Make a column layout of widgets and plots
-curdoc().add_root(column(row(rb_cases_deaths, rb_abs_rel, rb_tot_new), row(button, slider, lin_map), make_map(), row(make_lin(), make_log())))
-
+curdoc().add_root(column(row(rb_cases_deaths, rb_abs_rel, rb_tot_new), row(button, slider, lin_map),
+                         make_map(), row(make_lin(), make_log())))
