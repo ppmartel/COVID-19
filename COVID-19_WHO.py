@@ -435,20 +435,20 @@ def change_var(attr, old, new):
     source_grp.data = df_grp
 
     if rb_cases_deaths.active and rb_tot_new.active:
-        hover.tooltips = [('Date','@ToolTipDate'), ('Country/region','@Country'), ('Population','@Population')
+        hover.tooltips = [('Date','@ToolTipDate'), ('Country/region','@Country'), ('Population','@Population'),
                           ('New Deaths','@Deaths_New_Abs @Deaths_New_Rel{custom}')]
         hover.formatters = {'@Deaths_New_Rel' : custom}
 
     elif rb_cases_deaths.active:
-        hover.tooltips = [('Date','@ToolTipDate'), ('Country/region','@Country'), ('Population','@Population')
+        hover.tooltips = [('Date','@ToolTipDate'), ('Country/region','@Country'), ('Population','@Population'),
                           ('Tot Deaths','@Deaths_Tot_Abs @Deaths_Tot_Rel{custom}')]
         hover.formatters = {'@Deaths_Tot_Rel' : custom}
     elif rb_tot_new.active:
-        hover.tooltips = [('Date','@ToolTipDate'), ('Country/region','@Country'), ('Population','@Population')
+        hover.tooltips = [('Date','@ToolTipDate'), ('Country/region','@Country'), ('Population','@Population'),
                           ('New Cases','@Cases_New_Abs @Cases_New_Rel{custom}')]
         hover.formatters = {'@Cases_New_Rel' : custom}
     else:
-        hover.tooltips = [('Date','@ToolTipDate'), ('Country/region','@Country'), ('Population','@Population')
+        hover.tooltips = [('Date','@ToolTipDate'), ('Country/region','@Country'), ('Population','@Population'),
                           ('Tot Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}')]
         hover.formatters = {'@Cases_Tot_Rel' : custom}
 
