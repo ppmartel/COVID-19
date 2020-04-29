@@ -89,13 +89,9 @@ df_map['Deaths_Tot_Rel'] = 1000*df_deaths_map[show_dt]/df_deaths_map['Population
 df_map['Deaths_New_Rel'] = 1000*(df_deaths_map[show_dt]-df_deaths_map[prev_dt])/df_deaths_map['Population']
 df_map['Selected'] = df_map['Cases_Tot_Abs']
 
-#Read data to json.
+#Convert to json for plotting
 df_map_json = json.loads(df_map.to_json())
-
-#Convert to String like object.
 json_map = json.dumps(df_map_json)
-
-#Input GeoJSON source that contains features for plotting.
 source_map = GeoJSONDataSource(geojson = json_map)
 
 df_cases_tot = df_cases_tot.drop(['Continental Region','Statistical Region','Population'], axis=1).T
@@ -163,7 +159,7 @@ custom=CustomJSHover(code="""
                          return ""
                      }
                      var modified;
-                     var SI_SYMBOL = ["", "k", "M", "G", "T", "P", "E"];
+                     var SI_SYMBOL = ["", "k", "M", "B", "T"];
                      modified = 1000/value;
                      
                      // what tier? (determines SI symbol)
@@ -188,6 +184,14 @@ hover = HoverTool(tooltips= [('Date','@ToolTipDate'),
                              ('Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}')],
                   formatters={'@Cases_Tot_Rel' : custom}, mode = 'vline')
 
+def human_format(num):
+    num = float('{:.3g}'.format(num))
+    magnitude = 0
+    while abs(num) >= 1000:
+        magnitude += 1
+        num /= 1000.0
+    return '{}{}'.format('{:f}'.format(num).rstrip('0').rstrip('.'), ['', 'k', 'M', 'B', 'T'][magnitude])
+
 # Make the map
 def make_map():
     #Create figure object.
@@ -199,7 +203,7 @@ def make_map():
     
     p.add_layout(labels)
     
-    #Instantiate ColorMapper that maps numbers in a range, into a sequence of colors
+    # Choose linear or logarithmic color mapper
     if lin_map.active:
         mapper = LinearColorMapper(palette = palette, low = 0, high = plot_max[sel_var])
         color_bar = ColorBar(color_mapper = mapper, label_standoff = 8, width = 500, height = 20, 
@@ -294,19 +298,19 @@ def update_map(attr, old, new):
     sum_deaths_new_rel = 1000*sum_deaths_new_abs/sum_population
 
     if sum_cases_tot_abs > 0:
-        txt_cases_tot = 'Tot Cases: {0} (1/{1:.0f} Ppl)'.format(sum_cases_tot_abs, 1000/sum_cases_tot_rel)
+        txt_cases_tot = 'Tot Cases: {0} (1/{1} Ppl)'.format(sum_cases_tot_abs, human_format(1000/sum_cases_tot_rel))
     else:
         txt_cases_tot = 'Tot Cases: 0'
     if sum_cases_new_abs > 0:
-        txt_cases_new = 'New Cases: {0} (1/{1:.0f} Ppl)'.format(sum_cases_new_abs, 1000/sum_cases_new_rel)
+        txt_cases_new = 'New Cases: {0} (1/{1} Ppl)'.format(sum_cases_new_abs, human_format(1000/sum_cases_new_rel))
     else:
         txt_cases_new = 'New Cases: 0'
     if sum_deaths_tot_abs > 0:
-        txt_deaths_tot = 'Tot Deaths: {0} (1/{1:.0f} Ppl)'.format(sum_deaths_tot_abs, 1000/sum_deaths_tot_rel)
+        txt_deaths_tot = 'Tot Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_tot_abs, human_format(1000/sum_deaths_tot_rel))
     else:
         txt_deaths_tot = 'Tot Deaths: 0'
     if sum_deaths_new_abs > 0:
-        txt_deaths_new = 'New Deaths: {0} (1/{1:.0f} Ppl)'.format(sum_deaths_new_abs, 1000/sum_deaths_new_rel)
+        txt_deaths_new = 'New Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_new_abs, human_format(1000/sum_deaths_new_rel))
     else:
         txt_deaths_new = 'New Deaths: 0'
 
@@ -404,19 +408,19 @@ def update_plot(attr, old, new):
     sum_deaths_new_rel = 1000*sum_deaths_tot_abs/sum_population
 
     if sum_cases_tot_abs > 0:
-        txt_cases_tot = 'Tot Cases: {0} (1/{1:.0f} Ppl)'.format(sum_cases_tot_abs, 1000/sum_cases_tot_rel)
+        txt_cases_tot = 'Tot Cases: {0} (1/{1} Ppl)'.format(sum_cases_tot_abs, human_format(1000/sum_cases_tot_rel))
     else:
         txt_cases_tot = 'Tot Cases: 0'
     if sum_cases_new_abs > 0:
-        txt_cases_new = 'New Cases: {0} (1/{1:.0f} Ppl)'.format(sum_cases_new_abs, 1000/sum_cases_new_rel)
+        txt_cases_new = 'New Cases: {0} (1/{1} Ppl)'.format(sum_cases_new_abs, human_format(1000/sum_cases_new_rel))
     else:
         txt_cases_new = 'New Cases: 0'
     if sum_deaths_tot_abs > 0:
-        txt_deaths_tot = 'Tot Deaths: {0} (1/{1:.0f} Ppl)'.format(sum_deaths_tot_abs, 1000/sum_deaths_tot_rel)
+        txt_deaths_tot = 'Tot Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_tot_abs, human_format(1000/sum_deaths_tot_rel))
     else:
         txt_deaths_tot = 'Tot Deaths: 0'
     if sum_deaths_new_abs > 0:
-        txt_deaths_new = 'New Deaths: {0} (1/{1:.0f} Ppl)'.format(sum_deaths_new_abs, 1000/sum_deaths_new_rel)
+        txt_deaths_new = 'New Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_new_abs, human_format(1000/sum_deaths_new_rel))
     else:
         txt_deaths_new = 'New Deaths: 0'
         
@@ -553,14 +557,10 @@ source_map.selected.on_change('indices', update_plot)
 # Make a set of labels to show some totals on the map
 source_lab = ColumnDataSource(data=dict(x=[20,20,20,20,20], y=[100,80,60,40,20],
                                         text=[slider.value_as_date.strftime("%d %b %Y"),
-                                        'Tot Cases: {0} (1/{1:.0f} Ppl)'.format(sum_cases_tot_abs,
-                                                                                1000/sum_cases_tot_rel),
-                                        'New Cases: {0} (1/{1:.0f} Ppl)'.format(sum_cases_new_abs,
-                                                                                1000/sum_cases_new_rel),
-                                        'Tot Deaths: {0} (1/{1:.0f} Ppl)'.format(sum_deaths_tot_abs,
-                                                                                 1000/sum_deaths_tot_rel),
-                                        'New Deaths: {0} (1/{1:.0f} Ppl)'.format(sum_deaths_new_abs,
-                                                                                 1000/sum_deaths_new_rel)]))
+                                        'Tot Cases: {0} (1/{1} Ppl)'.format(sum_cases_tot_abs, human_format(1000/sum_cases_tot_rel)),
+                                        'New Cases: {0} (1/{1} Ppl)'.format(sum_cases_new_abs, human_format(1000/sum_cases_new_rel)),
+                                        'Tot Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_tot_abs, human_format(1000/sum_deaths_tot_rel)),
+                                        'New Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_new_abs, human_format(1000/sum_deaths_new_rel))]))
 labels = LabelSet(x='x', y='y', x_units='screen', y_units='screen', text='text', source=source_lab,
                   text_font_size='10pt', background_fill_color='white', background_fill_alpha=1.0)
 
