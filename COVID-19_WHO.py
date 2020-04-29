@@ -277,6 +277,10 @@ def make_log():
 def update_map(attr, old, new):
     global show_dt
     show_dt = slider.value_as_date.strftime("%Y-%m-%d")
+    if slider.value_as_datetime > first_dt:
+        prev_dt = (slider.value_as_date - timedelta(1)).strftime("%Y-%m-%d")
+    else:
+        prev_dt = show_dt
     dt_span.update(location=slider.value_as_date)
 
     sum_population = df_grp[df_grp['Date'] == show_dt]['Population'].sum()
