@@ -1,17 +1,14 @@
-from bokeh.io import curdoc, output_notebook, show, output_file
+from bokeh.io import curdoc
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, LogColorMapper, ColorBar
-from bokeh.models import LabelSet, HoverTool, TapTool, RadioButtonGroup, Button, DateSlider, Span, Toggle
+from bokeh.models import LabelSet, HoverTool, RadioButtonGroup, Button, DateSlider, Span, Toggle
 from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, BasicTicker, LogTicker, CustomJSHover
 from bokeh.palettes import brewer, Category20_16
 from bokeh.layouts import row, column
 from datetime import timedelta, date, datetime
 import geopandas as gpd
 import json
-import os
 import pandas as pd
-import sys
-import time
 
 ##################################################
 # Check that the data exists
@@ -19,16 +16,10 @@ import time
 
 first_dt = datetime.strptime('2020-01-21',"%Y-%m-%d")
 
-if os.path.exists('COVID-19_WHO_Cases.csv'):
-    print("Database exists - Reading it")
+df_cases_tot = pd.read_csv('COVID-19_WHO_Cases.csv', encoding='utf-8', index_col='Country')
+df_deaths_tot = pd.read_csv('COVID-19_WHO_Deaths.csv', encoding='utf-8', index_col='Country')
 
-    df_cases_tot = pd.read_csv('COVID-19_WHO_Cases.csv', encoding='utf-8', index_col='Country')
-    df_deaths_tot = pd.read_csv('COVID-19_WHO_Deaths.csv', encoding='utf-8', index_col='Country')
-
-    last_dt = datetime.strptime(df_cases_tot.columns.values[-1],'%Y-%m-%d')
-else:
-    print("Database does not exist")
-    sys.exit()
+last_dt = datetime.strptime(df_cases_tot.columns.values[-1],'%Y-%m-%d')
 
 prev_dt = (last_dt - timedelta(1)).strftime("%Y-%m-%d")
 show_dt = last_dt.strftime("%Y-%m-%d")
@@ -53,8 +44,6 @@ df_deaths_new[first_dt.strftime("%Y-%m-%d")] = 0
 ##################################################
 # Plot world map using geopandas
 ##################################################
-
-#output_notebook()
 
 geofile = '/home/martel/.local/share/cartopy/shapefiles/natural_earth/cultural/ne_110m_admin_0_countries.shp'
 
