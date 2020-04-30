@@ -1,5 +1,4 @@
 bokeh
 datetime
 geopandas
-json
 pandas
