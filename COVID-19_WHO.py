@@ -1,4 +1,4 @@
-from bokeh.io import curdoc
+from bokeh.io import curdoc, output_file, show
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, LogColorMapper, ColorBar
 from bokeh.models import LabelSet, HoverTool, RadioButtonGroup, Button, DateSlider, Span, Toggle
