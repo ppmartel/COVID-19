@@ -1,7 +1,7 @@
 from bokeh.io import curdoc, output_file, show
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, LogColorMapper, ColorBar
-from bokeh.models import LabelSet, HoverTool, RadioButtonGroup, Button, DateSlider, Span, Toggle
+from bokeh.models import Div, HoverTool, RadioButtonGroup, Button, DateSlider, Span, Toggle
 from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, BasicTicker, LogTicker, CustomJSHover
 from bokeh.palettes import brewer, Category20_16
 from bokeh.layouts import row, column
@@ -185,22 +185,20 @@ def human_format(num):
 def make_map():
     #Create figure object.
     p = figure(title = 'Map of COVID-19 '+plot_title[sel_var]+' (WHO)', plot_height = 550 , plot_width = 950, 
-                     x_range=(-180, 180), y_range=(-65, 90), toolbar_location = 'right',
-                     tools = 'pan, wheel_zoom, box_zoom, reset, tap')
+                     x_range=(-180, 180), y_range=(-65, 90), toolbar_location = 'above',
+                     tools = 'pan, wheel_zoom, box_zoom, reset, tap', sizing_mode="scale_width")
     p.xgrid.grid_line_color = None
     p.ygrid.grid_line_color = None
-    
-    p.add_layout(labels)
     
     # Choose linear or logarithmic color mapper
     if lin_map.active:
         mapper = LinearColorMapper(palette = palette, low = 0, high = plot_max[sel_var])
-        color_bar = ColorBar(color_mapper = mapper, label_standoff = 8, width = 500, height = 20, 
+        color_bar = ColorBar(color_mapper = mapper, label_standoff = 8, height = 20, #width = 500, 
                              border_line_color = None, location = (0,0), orientation = 'horizontal', 
                              ticker = BasicTicker(), major_label_overrides = tick_lin[sel_var])
     else:
         mapper = LogColorMapper(palette = palette, low = plot_min[sel_var], high = plot_max[sel_var])
-        color_bar = ColorBar(color_mapper = mapper, label_standoff = 8, width = 500, height = 20, 
+        color_bar = ColorBar(color_mapper = mapper, label_standoff = 8, height = 20, #width = 500, 
                              border_line_color = None, location = (0,0), orientation = 'horizontal', 
                              ticker = LogTicker(), major_label_overrides = tick_log[sel_var])
     
@@ -224,9 +222,9 @@ def make_map():
 # Make linear plot
 def make_lin():
     #Create figure object.
-    p = figure(title = 'Linear Plot of COVID-19 '+plot_title[sel_var]+' (WHO)', toolbar_location = 'right',
-               plot_height = 375, plot_width = 475, x_axis_type = 'datetime', 
-               tools = 'pan, wheel_zoom, box_zoom, reset')
+    p = figure(title = 'Linear Plot of COVID-19 '+plot_title[sel_var]+' (WHO)', toolbar_location = 'above',
+               plot_height = 250, plot_width = 500, x_axis_type = 'datetime', 
+               tools = 'pan, wheel_zoom, box_zoom, reset', sizing_mode="scale_width")
 
     # Format your x-axis as datetime.
     p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
@@ -247,9 +245,9 @@ def make_lin():
 # Make logarithmic plot
 def make_log():
     #Create figure object.
-    p = figure(title = 'Logarithmic Plot of COVID-19 '+plot_title[sel_var]+' (WHO)',toolbar_location = 'right',
-               plot_height = 375, plot_width = 475, x_axis_type = 'datetime', y_axis_type = 'log', 
-               tools = 'pan, wheel_zoom, box_zoom, reset')
+    p = figure(title = 'Logarithmic Plot of COVID-19 '+plot_title[sel_var]+' (WHO)',toolbar_location = 'above',
+               plot_height = 250, plot_width = 500, x_axis_type = 'datetime', y_axis_type = 'log', 
+               tools = 'pan, wheel_zoom, box_zoom, reset', sizing_mode="scale_width")
 
     # Format your x-axis as datetime.
     p.xaxis[0].formatter = DatetimeTickFormatter(days='%b %d')
@@ -285,27 +283,28 @@ def update_map(attr, old, new):
     sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
     sum_deaths_tot_rel = 1000*sum_deaths_tot_abs/sum_population
     sum_deaths_new_rel = 1000*sum_deaths_new_abs/sum_population
+    
+    outtxt = slider.value_as_date.strftime("%d %b %Y") + '</br>'
 
     if sum_cases_tot_abs > 0:
-        txt_cases_tot = 'Tot Cases: {0} (1/{1} Ppl)'.format(sum_cases_tot_abs, human_format(1000/sum_cases_tot_rel))
+        outtxt += 'Tot Cases: {0} (1/{1} Ppl)</br>'.format(sum_cases_tot_abs, human_format(1000/sum_cases_tot_rel))
     else:
-        txt_cases_tot = 'Tot Cases: 0'
+        outtxt += 'Tot Cases: 0</br>'
     if sum_cases_new_abs > 0:
-        txt_cases_new = 'New Cases: {0} (1/{1} Ppl)'.format(sum_cases_new_abs, human_format(1000/sum_cases_new_rel))
+        outtxt += 'New Cases: {0} (1/{1} Ppl)</br>'.format(sum_cases_new_abs, human_format(1000/sum_cases_new_rel))
     else:
-        txt_cases_new = 'New Cases: 0'
+        outtxt += 'New Cases: 0</br>'
     if sum_deaths_tot_abs > 0:
-        txt_deaths_tot = 'Tot Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_tot_abs, human_format(1000/sum_deaths_tot_rel))
+        outtxt += 'Tot Deaths: {0} (1/{1} Ppl)</br>'.format(sum_deaths_tot_abs, human_format(1000/sum_deaths_tot_rel))
     else:
-        txt_deaths_tot = 'Tot Deaths: 0'
+        outtxt += 'Tot Deaths: 0</br>'
     if sum_deaths_new_abs > 0:
-        txt_deaths_new = 'New Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_new_abs, human_format(1000/sum_deaths_new_rel))
+        outtxt += 'New Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_new_abs, human_format(1000/sum_deaths_new_rel))
     else:
-        txt_deaths_new = 'New Deaths: 0'
-
-    source_lab.data = dict(x=[20,20,20,20,20], y=[100,80,60,40,20],
-                           text=[slider.value_as_date.strftime("%d %b %Y"), txt_cases_tot, txt_cases_new,
-                                 txt_deaths_tot, txt_deaths_new])
+        outtxt += 'New Deaths: 0'
+    
+    #output.text = outtext
+    output.update(text=outtext)
     
     df_map['Population'] = df_cases_map['Population']
     df_map['Cases_Tot_Abs'] = df_cases_map[show_dt]
@@ -396,26 +395,27 @@ def update_plot(attr, old, new):
     sum_deaths_tot_rel = 1000*sum_deaths_tot_abs/sum_population
     sum_deaths_new_rel = 1000*sum_deaths_tot_abs/sum_population
 
+    outtxt = slider.value_as_date.strftime("%d %b %Y") + '</br>'
+
     if sum_cases_tot_abs > 0:
-        txt_cases_tot = 'Tot Cases: {0} (1/{1} Ppl)'.format(sum_cases_tot_abs, human_format(1000/sum_cases_tot_rel))
+        outtxt += 'Tot Cases: {0} (1/{1} Ppl)</br>'.format(sum_cases_tot_abs, human_format(1000/sum_cases_tot_rel))
     else:
-        txt_cases_tot = 'Tot Cases: 0'
+        outtxt += 'Tot Cases: 0</br>'
     if sum_cases_new_abs > 0:
-        txt_cases_new = 'New Cases: {0} (1/{1} Ppl)'.format(sum_cases_new_abs, human_format(1000/sum_cases_new_rel))
+        outtxt += 'New Cases: {0} (1/{1} Ppl)</br>'.format(sum_cases_new_abs, human_format(1000/sum_cases_new_rel))
     else:
-        txt_cases_new = 'New Cases: 0'
+        outtxt += 'New Cases: 0</br>'
     if sum_deaths_tot_abs > 0:
-        txt_deaths_tot = 'Tot Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_tot_abs, human_format(1000/sum_deaths_tot_rel))
+        outtxt += 'Tot Deaths: {0} (1/{1} Ppl)</br>'.format(sum_deaths_tot_abs, human_format(1000/sum_deaths_tot_rel))
     else:
-        txt_deaths_tot = 'Tot Deaths: 0'
+        outtxt += 'Tot Deaths: 0</br>'
     if sum_deaths_new_abs > 0:
-        txt_deaths_new = 'New Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_new_abs, human_format(1000/sum_deaths_new_rel))
+        outtxt += 'New Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_new_abs, human_format(1000/sum_deaths_new_rel))
     else:
-        txt_deaths_new = 'New Deaths: 0'
-        
-    source_lab.data = dict(x=[20,20,20,20,20], y=[100,80,60,40,20],
-                           text=[slider.value_as_date.strftime("%d %b %Y"), txt_cases_tot, txt_cases_new,
-                                 txt_deaths_tot, txt_deaths_new])
+        outtxt += 'New Deaths: 0'
+      
+    #output.text = outtext
+    output.update(text = outtext)
     
 def change_var(attr, old, new):
     curdoc().clear()
@@ -449,8 +449,7 @@ def change_var(attr, old, new):
                           ('Tot Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}')]
         hover.formatters = {'@Cases_Tot_Rel' : custom}
 
-    curdoc().add_root(column(row(rb_cases_deaths, rb_abs_rel, rb_tot_new), row(button, slider, lin_map),
-                             make_map(), row(make_lin(), make_log())))
+    curdoc().add_root(row(column(make_map(), row(column(heading, row(button, lin_map, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, output, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
 
 def animate_update():
     global show_dt
@@ -511,30 +510,35 @@ tick_log = [{'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '10000
              '1':'1/1k', '10':'1/100', '100':'1/10'},
             {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k',
              '1':'1/1k', '10':'1/100', '100':'1/10'}]
+             
+# heading fills available width
+heading = Div(text='Worldwide COVID-19 Statistics - <a href="https://www.who.int/emergencies/diseases/novel-coronavirus-2019/situation-reports" target="_blank">WHO</a></br>Click on countries (multiple with shift)</br>Created by Phil Martel - <a href="https://github.com/ppmartel/COVID-19" target="_blank">GitHub Repository</a>',
+              style={'background-color':'#c8cfd6', 'outline':'black solid thin', 'text-align':'center'},
+              height=70, align="center", sizing_mode="stretch_width")
 
-rb_cases_deaths = RadioButtonGroup(labels=['Cases', 'Deaths'], active=0)
+# Make a toggle to cycle through the dates
+button = Button(label='► Play', height = 30)
+button.on_click(animate)
+
+# Make a toggle for changing the map to linear
+lin_map = Toggle(label = 'Linear Map', active = False, height = 30)
+lin_map.on_change('active', change_var)
+
+rb_cases_deaths = RadioButtonGroup(labels=['Cases', 'Deaths'], active=0, height = 30)
 rb_cases_deaths.on_change('active', change_var)
 
-rb_abs_rel = RadioButtonGroup(labels=['Per Region', 'Per 1k Ppl'], active=0)
+rb_abs_rel = RadioButtonGroup(labels=['Per Region', 'Per 1k Ppl'], active=0, height = 30)
 rb_abs_rel.on_change('active', change_var)
 
-rb_tot_new = RadioButtonGroup(labels=['Total', 'New'], active=0)
+rb_tot_new = RadioButtonGroup(labels=['Total', 'New'], active=0, height = 30)
 rb_tot_new.on_change('active', change_var)
 
 sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
 
-# Make a toggle to cycle through the dates
-button = Button(label='► Play', width=90, margin = (20, 0, 0, 10))
-button.on_click(animate)
-
 # Make a selection of the date to plot
-slider = DateSlider(title = 'Date', start = first_dt, end = last_dt, step = 1, value = last_dt, width = 650,
-                    margin = (10, 40, 10, 50))
+slider = DateSlider(title = 'Date', start = first_dt, end = last_dt, step = 1, value = last_dt,
+                    height = 20, margin = (20, 50, 20, 50), sizing_mode="stretch_width")
 slider.on_change('value_throttled', update_map)
-
-# Make a toggle for changing the map to linear
-lin_map = Toggle(label = 'Linear Map', active = False, width = 90, margin = (20, 10, 0, 10))
-lin_map.on_change('active', change_var)
 
 # Make a span to show current date in plots
 dt_span = Span(location=slider.value_as_date, dimension='height', line_color='red', line_dash='solid',
@@ -544,15 +548,11 @@ dt_span = Span(location=slider.value_as_date, dimension='height', line_color='re
 source_map.selected.on_change('indices', update_plot)
 
 # Make a set of labels to show some totals on the map
-source_lab = ColumnDataSource(data=dict(x=[20,20,20,20,20], y=[100,80,60,40,20],
-                                        text=[slider.value_as_date.strftime("%d %b %Y"),
-                                        'Tot Cases: {0} (1/{1} Ppl)'.format(sum_cases_tot_abs, human_format(1000/sum_cases_tot_rel)),
-                                        'New Cases: {0} (1/{1} Ppl)'.format(sum_cases_new_abs, human_format(1000/sum_cases_new_rel)),
-                                        'Tot Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_tot_abs, human_format(1000/sum_deaths_tot_rel)),
-                                        'New Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_new_abs, human_format(1000/sum_deaths_new_rel))]))
-labels = LabelSet(x='x', y='y', x_units='screen', y_units='screen', text='text', source=source_lab,
-                  text_font_size='10pt', background_fill_color='white', background_fill_alpha=1.0)
+outtext = 'Tot Cases: {0} (1/{1} Ppl)</br>'.format(sum_cases_tot_abs, human_format(1000/sum_cases_tot_rel))
+outtext += 'New Cases: {0} (1/{1} Ppl)</br>'.format(sum_cases_new_abs, human_format(1000/sum_cases_new_rel))
+outtext += 'Tot Deaths: {0} (1/{1} Ppl)</br>'.format(sum_deaths_tot_abs, human_format(1000/sum_deaths_tot_rel))
+outtext += 'New Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_new_abs, human_format(1000/sum_deaths_new_rel))
+output = Div(text=outtext)
 
 # Make a column layout of widgets and plots
-curdoc().add_root(column(row(rb_cases_deaths, rb_abs_rel, rb_tot_new), row(button, slider, lin_map),
-                         make_map(), row(make_lin(), make_log())))
+curdoc().add_root(row(column(make_map(), row(column(heading, row(button, lin_map, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, output, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
