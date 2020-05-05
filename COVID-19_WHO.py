@@ -3,6 +3,7 @@ from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, LogColorMapper, ColorBar
 from bokeh.models import Div, HoverTool, RadioButtonGroup, Button, DateSlider, Span, Toggle
 from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, BasicTicker, LogTicker, CustomJSHover
+from bokeh.models import DataTable, TableColumn
 from bokeh.palettes import brewer, Category20_16
 from bokeh.layouts import row, column
 from datetime import timedelta, date, datetime
@@ -173,13 +174,15 @@ hover = HoverTool(tooltips= [('Date','@ToolTipDate'),
                              ('Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}')],
                   formatters={'@Cases_Tot_Rel' : custom}, mode = 'vline')
 
-def human_format(num):
-    num = float('{:.3g}'.format(num))
+def my_format(num):
+    if num == 0:
+        return '0'
+    num = float('{:.3g}'.format(1000/num))
     magnitude = 0
     while abs(num) >= 1000:
         magnitude += 1
         num /= 1000.0
-    return '{}{}'.format('{:f}'.format(num).rstrip('0').rstrip('.'), ['', 'k', 'M', 'B', 'T'][magnitude])
+    return '1/{}{} Ppl'.format('{:f}'.format(num).rstrip('0').rstrip('.'), ['', 'k', 'M', 'B', 'T'][magnitude])
 
 # Make the map
 def make_map():
@@ -222,7 +225,7 @@ def make_map():
 # Make linear plot
 def make_lin():
     #Create figure object.
-    p = figure(title = 'Linear Plot of COVID-19 '+plot_title[sel_var]+' (WHO)', toolbar_location = 'above',
+    p = figure(title = 'Lin. Plot of COVID-19 '+plot_title[sel_var]+' (WHO)', toolbar_location = 'above',
                plot_height = 250, plot_width = 500, x_axis_type = 'datetime', 
                tools = 'pan, wheel_zoom, box_zoom, reset', sizing_mode="scale_width")
 
@@ -245,7 +248,7 @@ def make_lin():
 # Make logarithmic plot
 def make_log():
     #Create figure object.
-    p = figure(title = 'Logarithmic Plot of COVID-19 '+plot_title[sel_var]+' (WHO)',toolbar_location = 'above',
+    p = figure(title = 'Log. Plot of COVID-19 '+plot_title[sel_var]+' (WHO)',toolbar_location = 'above',
                plot_height = 250, plot_width = 500, x_axis_type = 'datetime', y_axis_type = 'log', 
                tools = 'pan, wheel_zoom, box_zoom, reset', sizing_mode="scale_width")
 
@@ -284,27 +287,10 @@ def update_map(attr, old, new):
     sum_deaths_tot_rel = 1000*sum_deaths_tot_abs/sum_population
     sum_deaths_new_rel = 1000*sum_deaths_new_abs/sum_population
     
-    outtxt = slider.value_as_date.strftime("%d %b %Y") + '</br>'
-
-    if sum_cases_tot_abs > 0:
-        outtxt += 'Tot Cases: {0} (1/{1} Ppl)</br>'.format(sum_cases_tot_abs, human_format(1000/sum_cases_tot_rel))
-    else:
-        outtxt += 'Tot Cases: 0</br>'
-    if sum_cases_new_abs > 0:
-        outtxt += 'New Cases: {0} (1/{1} Ppl)</br>'.format(sum_cases_new_abs, human_format(1000/sum_cases_new_rel))
-    else:
-        outtxt += 'New Cases: 0</br>'
-    if sum_deaths_tot_abs > 0:
-        outtxt += 'Tot Deaths: {0} (1/{1} Ppl)</br>'.format(sum_deaths_tot_abs, human_format(1000/sum_deaths_tot_rel))
-    else:
-        outtxt += 'Tot Deaths: 0</br>'
-    if sum_deaths_new_abs > 0:
-        outtxt += 'New Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_new_abs, human_format(1000/sum_deaths_new_rel))
-    else:
-        outtxt += 'New Deaths: 0'
-    
-    #output.text = outtext
-    output.update(text=outtext)
+    source_out.data = dict(stat=['Tot Cases', 'New Cases', 'Tot Deaths', 'New Deaths'],
+                           vabs=[sum_cases_tot_abs, sum_cases_new_abs, sum_deaths_tot_abs, sum_deaths_new_abs],
+                           vrel=[my_format(sum_cases_tot_rel), my_format(sum_cases_new_rel),
+                                 my_format(sum_deaths_tot_rel), my_format(sum_deaths_new_rel)])
     
     df_map['Population'] = df_cases_map['Population']
     df_map['Cases_Tot_Abs'] = df_cases_map[show_dt]
@@ -394,28 +380,11 @@ def update_plot(attr, old, new):
     sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
     sum_deaths_tot_rel = 1000*sum_deaths_tot_abs/sum_population
     sum_deaths_new_rel = 1000*sum_deaths_tot_abs/sum_population
-
-    outtxt = slider.value_as_date.strftime("%d %b %Y") + '</br>'
-
-    if sum_cases_tot_abs > 0:
-        outtxt += 'Tot Cases: {0} (1/{1} Ppl)</br>'.format(sum_cases_tot_abs, human_format(1000/sum_cases_tot_rel))
-    else:
-        outtxt += 'Tot Cases: 0</br>'
-    if sum_cases_new_abs > 0:
-        outtxt += 'New Cases: {0} (1/{1} Ppl)</br>'.format(sum_cases_new_abs, human_format(1000/sum_cases_new_rel))
-    else:
-        outtxt += 'New Cases: 0</br>'
-    if sum_deaths_tot_abs > 0:
-        outtxt += 'Tot Deaths: {0} (1/{1} Ppl)</br>'.format(sum_deaths_tot_abs, human_format(1000/sum_deaths_tot_rel))
-    else:
-        outtxt += 'Tot Deaths: 0</br>'
-    if sum_deaths_new_abs > 0:
-        outtxt += 'New Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_new_abs, human_format(1000/sum_deaths_new_rel))
-    else:
-        outtxt += 'New Deaths: 0'
-      
-    #output.text = outtext
-    output.update(text = outtext)
+    
+    source_out.data = dict(stat=['Tot Cases', 'New Cases', 'Tot Deaths', 'New Deaths'],
+                           vabs=[sum_cases_tot_abs, sum_cases_new_abs, sum_deaths_tot_abs, sum_deaths_new_abs],
+                           vrel=[my_format(sum_cases_tot_rel), my_format(sum_cases_new_rel),
+                                 my_format(sum_deaths_tot_rel), my_format(sum_deaths_new_rel)])
     
 def change_var(attr, old, new):
     curdoc().clear()
@@ -449,7 +418,7 @@ def change_var(attr, old, new):
                           ('Tot Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}')]
         hover.formatters = {'@Cases_Tot_Rel' : custom}
 
-    curdoc().add_root(row(column(make_map(), row(column(heading, row(button, lin_map, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, output, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
+    curdoc().add_root(row(column(make_map(), row(column(heading, row(button, lin_map, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, table_out, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
 
 def animate_update():
     global show_dt
@@ -548,11 +517,15 @@ dt_span = Span(location=slider.value_as_date, dimension='height', line_color='re
 source_map.selected.on_change('indices', update_plot)
 
 # Make a set of labels to show some totals on the map
-outtext = 'Tot Cases: {0} (1/{1} Ppl)</br>'.format(sum_cases_tot_abs, human_format(1000/sum_cases_tot_rel))
-outtext += 'New Cases: {0} (1/{1} Ppl)</br>'.format(sum_cases_new_abs, human_format(1000/sum_cases_new_rel))
-outtext += 'Tot Deaths: {0} (1/{1} Ppl)</br>'.format(sum_deaths_tot_abs, human_format(1000/sum_deaths_tot_rel))
-outtext += 'New Deaths: {0} (1/{1} Ppl)'.format(sum_deaths_new_abs, human_format(1000/sum_deaths_new_rel))
-output = Div(text=outtext)
+data_out = dict(stat=['Tot Cases', 'New Cases', 'Tot Deaths', 'New Deaths'],
+                vabs=[sum_cases_tot_abs, sum_cases_new_abs, sum_deaths_tot_abs, sum_deaths_new_abs],
+                vrel=[my_format(sum_cases_tot_rel), my_format(sum_cases_new_rel),
+                      my_format(sum_deaths_tot_rel), my_format(sum_deaths_new_rel)])
+source_out = ColumnDataSource(data_out)
+columns_out = [TableColumn(field='stat', title="Statistic"),
+               TableColumn(field='vabs', title="Per Region"),
+               TableColumn(field='vrel', title="Per Capita")]
+table_out = DataTable(source=source_out, columns=columns_out, height=125, width=100, sizing_mode="stretch_width")
 
 # Make a column layout of widgets and plots
-curdoc().add_root(row(column(make_map(), row(column(heading, row(button, lin_map, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, output, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
+curdoc().add_root(row(column(make_map(), row(column(heading, row(button, lin_map, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, table_out, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
