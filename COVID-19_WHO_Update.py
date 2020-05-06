@@ -39,8 +39,8 @@ else:
     start_dt = datetime.strptime('2020-02-03',"%Y-%m-%d")
     start_rep = 14
     
-end_dt = datetime.now() - timedelta(1)
-end_rep = first_rep + int ((end_dt - first_dt).days)
+end_dt = datetime.strptime('2020-04-30',"%Y-%m-%d")
+end_rep = 101
 
 ##################################################
 # Update data if needed
@@ -81,6 +81,7 @@ for dt in range(int ((end_dt - start_dt).days)+1):
 
     if len(tab_who) > 0:
         df_who = pd.concat(tab_who)
+        df_who.to_csv('WHO/'+new_date+'.csv', index = True, encoding='utf-8')
         cols = list(i for i in range(7,len(df_who.columns),1))
         df_who.drop(df_who.columns[cols], axis=1, inplace = True)
         df_who.replace(to_replace = '\s*\(.*\)', value = '', regex = True, inplace = True)
@@ -88,8 +89,20 @@ for dt in range(int ((end_dt - start_dt).days)+1):
         cases_tot = pd.to_numeric(df_who[df_who[0] == "Grand total"][1].replace(' ', '', regex = True).values[0])
         deaths_tot = pd.to_numeric(df_who[df_who[0] == "Grand total"][3].replace(' ', '', regex = True).values[0])
 
-        if new_rep >= 42:
-            # Format for reports 42+
+        if new_rep >= 99:
+            # Format for reports 99+
+            df_who.drop(df_who.columns[[2,4,5,6]], axis=1, inplace = True)
+        elif new_rep >= 96:
+            # Format for reports 96-98
+            tab_who[0].drop(tab_who[0].columns[[2]], axis=1, inplace = True)
+            df_who = pd.concat(tab_who)
+            cols = list(i for i in range(7,len(df_who.columns),1))
+            df_who.drop(df_who.columns[cols], axis=1, inplace = True)
+            df_who.replace(to_replace = '\s*\(.*\)', value = '', regex = True, inplace = True)
+            df_who.replace(to_replace = '\s*\[.*\]', value = '', regex = True, inplace = True)
+            df_who.drop(df_who.columns[[2,4,5,6]], axis=1, inplace = True)
+        elif new_rep >= 42:
+            # Format for reports 42-95
             df_who.drop(df_who.columns[[2,4,5,6]], axis=1, inplace = True)
         elif new_rep >= 39:
             # Format for reports 39-41, fewer columns than the rest
@@ -148,26 +161,32 @@ for dt in range(int ((end_dt - start_dt).days)+1):
                                                           'Caribbean Netherlands')
         df_who['Country'] = df_who['Country'].str.replace('Brunei Darussalam','Brunei')
         df_who['Country'] = df_who['Country'].str.replace('^Congo','Republic of the Congo')
+        df_who['Country'] = df_who['Country'].str.replace('^Central African$','Central African Republic')
+        df_who['Country'] = df_who['Country'].str.replace('^Republic$','Central African Republic')
         df_who['Country'] = df_who['Country'].str.replace('.*Ivoire','Ivory Coast')
         df_who['Country'] = df_who['Country'].str.replace('Holy See','Vatican')
         df_who['Country'] = df_who['Country'].str.replace('Eswatini', 'eSwatini')
         df_who['Country'] = df_who['Country'].str.replace('^Lao.*', 'Laos')
         df_who['Country'] = df_who['Country'].str.replace('occupied Palestinian territory','Palestine')
         df_who['Country'] = df_who['Country'].str.replace('.*Mariana.*','Northern Mariana Islands')
+        df_who['Country'] = df_who['Country'].str.replace('^the$','Northern Mariana Islands')
         df_who['Country'] = df_who['Country'].str.replace('Republic of Korea', 'South Korea')
         df_who['Country'] = df_who['Country'].str.replace('Republic of Moldova', 'Moldova')
         df_who['Country'] = df_who['Country'].str.replace('Russian Federation', 'Russia')
         df_who['Country'] = df_who['Country'].str.replace('Saint Barthélemy','Saint Barthelemy')
+        df_who['Country'] = df_who['Country'].str.replace('^São Tomé and$','São Tomé and Príncipe')
+        df_who['Country'] = df_who['Country'].str.replace('^Príncipe$','São Tomé and Príncipe')
         df_who['Country'] = df_who['Country'].str.replace('Serbi.*','Republic of Serbia')
         df_who['Country'] = df_who['Country'].str.replace('Syrian Arab Republic','Syria')
         df_who['Country'] = df_who['Country'].str.replace('Timor-Leste','East Timor')
         df_who['Country'] = df_who['Country'].str.replace('The United','United')
         df_who['Country'] = df_who['Country'].str.replace('^Kingdom','United Kingdom')
+        df_who['Country'] = df_who['Country'].str.replace('^United Republic of$','United Republic of Tanzania')
         df_who['Country'] = df_who['Country'].str.replace('Viet Nam','Vietnam')        
         df_who['Country'] = df_who['Country'].str.replace('.*conveyance.*','Diamond Princess')
 
         df_who.set_index('Country', inplace = True)
-        df_who.to_csv('WHO/'+new_date+'.csv', index = True, encoding='utf-8')
+        #df_who.to_csv('WHO/'+new_date+'.csv', index = True, encoding='utf-8')
 
         df_who.fillna(0, inplace = True)
 
