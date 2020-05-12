@@ -3,7 +3,7 @@ A python dashboard for COVID-19 statistics. Deployed at https://worldwide-covid-
 
 History
 -------
-With the world in the grips of the COVID-19 pandemic, I got tired of looking at daily situation reports from the World Health Organization. I started writing some python code to simply scrape the data from the report pdfs, and plot it. I started to look into producing a dashboard with a map, and eventually landed with Bokeh and GeoPandas.
+With the world in the grips of the COVID-19 pandemic, I got tired of looking at daily situation reports from the World Health Organization. I started writing some python code to simply scrape the data from the report pdfs, and plot it. I started to look into producing a dashboard with a map, and eventually landed with Bokeh and GeoPandas. After yet another change to the format of the WHO reports (each requiring new tweaking to the scraper) I found where the data can be directly downloaded, and will rely on that from now on.
 
 Built With
 ----------
@@ -13,7 +13,15 @@ Built With
 
 Running
 -------
-After getting python running with the above libraries, simply go into the cloned directory and run
+First, obviously get python running with the above libraries. Second, go into the cloned directory and download the COVID-19 data from the WHO website into this directory. It is a csv file found at:
+
+https://covid19.who.int/
+
+with the 'Download Map Data' button in the bottom right of the map. Also download, and unzip into this directory, the shape files from natural earth:
+
+https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/110m/cultural/ne_110m_admin_0_countries.zip
+
+Finally run:
 
 `bokeh serve --show COVID-19_WHO.py`
 
@@ -21,7 +29,7 @@ Resources
 ---------
 Data obtained from
 * WHO - https://www.who.int/emergencies/diseases/novel-coronavirus-2019/situation-reports/
-* Johns Hopkins (in dev) - https://github.com/CSSEGISandData/COVID-19
+* Johns Hopkins (working on) - https://github.com/CSSEGISandData/COVID-19
 
 Ideas and code snippets for
 * Visualization
