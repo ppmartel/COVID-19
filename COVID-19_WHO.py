@@ -12,35 +12,57 @@ import json
 import pandas as pd
 
 ##################################################
-# Check that the data exists
+# Get the WHO data from disk
 ##################################################
 
-first_dt = datetime.strptime('2020-01-21',"%Y-%m-%d")
+draw_sub_unit = ['Greenland', 'French Southern and Antarctic Lands', 'New Caledonia', 'Falkland Islands', 'Puerto Rico']
 
-df_cases_tot = pd.read_csv('COVID-19_WHO_Cases.csv', encoding='utf-8', index_col='Country')
-df_deaths_tot = pd.read_csv('COVID-19_WHO_Deaths.csv', encoding='utf-8', index_col='Country')
+def get_who(location):
+    df = pd.read_csv(location, encoding='utf-8', error_bad_lines=False)
 
-last_dt = datetime.strptime(df_cases_tot.columns.values[-1],'%Y-%m-%d')
+    #for i, index_this in enumerate(df.index[df['Province/State'].notnull()].tolist()):
+    #    country = df.iloc[index_this,1]
+    #    if country != 'Australia' and country != 'Canada' and country != 'China' and df.iloc[index_this,0] in draw_sub_unit:
+    #        df.iloc[index_this,1] = df.iloc[index_this,0]
 
-prev_dt = (last_dt - timedelta(1)).strftime("%Y-%m-%d")
-show_dt = last_dt.strftime("%Y-%m-%d")
+    df.drop(df.columns[[1,3]], axis=1, inplace=True)
+    df.rename(columns = {df.columns[0]:'Date', df.columns[1]:'Country', df.columns[2]:'Deaths_New_Abs', df.columns[3]:'Deaths_Tot_Abs', df.columns[4]:'Cases_New_Abs', df.columns[5]:'Cases_Tot_Abs'}, inplace=True)
+    df['Date'] = pd.to_datetime(df['Date'])
+    df['ToolTipDate'] = df.Date.map(lambda x: x.strftime("%b %d"))
 
-df_cases_tot.fillna(0, inplace = True)
-df_deaths_tot.fillna(0, inplace = True)
+    df['Country'] = df['Country'].str.replace('\s*\(.*\)','')
 
-# Make a copy within which the day to day changes are calculated
-# Probably a better way to do this, but this works for now
-df_cases_new = df_cases_tot.copy()
-df_deaths_new = df_deaths_tot.copy()
-new_dt = last_dt
-while new_dt > first_dt:
-    df_cases_new[new_dt.strftime("%Y-%m-%d")] = (df_cases_new[new_dt.strftime("%Y-%m-%d")] -
-                                                 df_cases_new[(new_dt - timedelta(1)).strftime("%Y-%m-%d")])
-    df_deaths_new[new_dt.strftime("%Y-%m-%d")] = (df_deaths_new[new_dt.strftime("%Y-%m-%d")] -
-                                                  df_deaths_new[(new_dt - timedelta(1)).strftime("%Y-%m-%d")])
-    new_dt = (new_dt - timedelta(1))
-df_cases_new[first_dt.strftime("%Y-%m-%d")] = 0
-df_deaths_new[first_dt.strftime("%Y-%m-%d")] = 0
+    df['Country'] = df['Country'].str.replace('Bahamas','The Bahamas')
+    df['Country'] = df['Country'].str.replace('Bonaire, Sint Eustatius and Saba','Caribbean Netherlands')
+    df['Country'] = df['Country'].str.replace('Brunei Darussalam','Brunei')
+    df['Country'] = df['Country'].str.replace('^Congo','Republic of the Congo')
+    df['Country'] = df['Country'].str.replace('.*Ivoire','Ivory Coast')
+    df['Country'] = df['Country'].str.replace('Curacao','Curaçao')
+    df['Country'] = df['Country'].str.replace('Eswatini', 'eSwatini')
+    df['Country'] = df['Country'].str.replace('Holy See','Vatican')
+    df['Country'] = df['Country'].str.replace('International conveyance','Diamond Princess')
+    df['Country'] = df['Country'].str.replace('^Kosovo.*','Kosovo')
+    df['Country'] = df['Country'].str.replace('^Lao.*', 'Laos')
+    df['Country'] = df['Country'].str.replace('^occupied.*','Palestine')
+    df['Country'] = df['Country'].str.replace('Republic of Korea', 'South Korea')
+    df['Country'] = df['Country'].str.replace('Republic of Moldova', 'Moldova')
+    df['Country'] = df['Country'].str.replace('Russian Federation', 'Russia')
+    df['Country'] = df['Country'].str.replace('Saint Barthélemy','Saint Barthelemy')
+    df['Country'] = df['Country'].str.replace('Sao Tome and Principe','São Tomé and Príncipe')
+    df['Country'] = df['Country'].str.replace('Serbia','Republic of Serbia')
+    df['Country'] = df['Country'].str.replace('Syrian Arab Republic','Syria')
+    df['Country'] = df['Country'].str.replace('The United Kingdom','United Kingdom')
+    df['Country'] = df['Country'].str.replace('Timor-Leste','East Timor')
+    df['Country'] = df['Country'].str.replace('Viet Nam','Vietnam')
+
+    return df
+
+df_who = get_who('WHO-COVID-19-global-data.csv')
+
+first_dt = min(df_who['Date'])
+last_dt = max(df_who['Date'])
+prev_dt = (last_dt - timedelta(1))
+show_dt = last_dt
 
 ##################################################
 # Plot world map using geopandas
@@ -54,95 +76,75 @@ df_geo.columns = ['Country','Code','geometry']
 # 2019 update of Macedonia to North Macedonia
 df_geo['Country'] = df_geo['Country'].str.replace('Macedonia','North Macedonia')
 
+# Specific for JHU, includes Puerto Rico as part of US
+#df_geo['Country'] = df_geo['Country'].str.replace('Puerto Rico','United States of America')
+
 # Remove Antarctica
 df_geo.drop([159], inplace = True)
 #df_geo.drop([239], inplace = True)
+
+df_countries = pd.read_csv('Countries.csv', encoding='utf-8')[['Country', 'Population']]
+df_geo = df_geo.merge(df_countries, left_on = 'Country', right_on = 'Country', how = 'left')
 
 # Fix multipolygon rendering (though now selecting a polygon does not select the other parts)
 df_geo = df_geo.explode()
 df_geo.reset_index(inplace = True)
 
-# Merge cases and deaths with map
-df_cases_map = df_geo.merge(df_cases_tot, left_on = 'Country', right_on = 'Country', how = 'left')
-df_deaths_map = df_geo.merge(df_deaths_tot, left_on = 'Country', right_on = 'Country', how = 'left')
-
 # Build results map
 df_map = df_geo.copy()
-df_map['Population'] = df_cases_map['Population']
-df_map['Cases_Tot_Abs'] = df_cases_map[show_dt]
-df_map['Cases_New_Abs'] = df_cases_map[show_dt]-df_cases_map[prev_dt]
-df_map['Cases_Tot_Rel'] = 1000*df_cases_map[show_dt]/df_cases_map['Population']
-df_map['Cases_New_Rel'] = 1000*(df_cases_map[show_dt]-df_cases_map[prev_dt])/df_cases_map['Population']
-df_map['Deaths_Tot_Abs'] = df_deaths_map[show_dt]
-df_map['Deaths_New_Abs'] = df_deaths_map[show_dt]-df_deaths_map[prev_dt]
-df_map['Deaths_Tot_Rel'] = 1000*df_deaths_map[show_dt]/df_deaths_map['Population']
-df_map['Deaths_New_Rel'] = 1000*(df_deaths_map[show_dt]-df_deaths_map[prev_dt])/df_deaths_map['Population']
+df_tmp = df_who[df_who['Date'] == show_dt][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs']]
+df_map = df_map.merge(df_tmp, left_on = 'Country', right_on = 'Country', how = 'left')
+df_map['Cases_Tot_Rel'] = 1000*df_map['Cases_Tot_Abs']/df_map['Population']
+df_map['Cases_New_Rel'] = 1000*df_map['Cases_New_Abs']/df_map['Population']
+df_map['Deaths_Tot_Rel'] = 1000*df_map['Deaths_Tot_Abs']/df_map['Population']
+df_map['Deaths_New_Rel'] = 1000*df_map['Deaths_New_Abs']/df_map['Population']
 df_map['Selected'] = df_map['Cases_Tot_Abs']
+df_map.fillna(0, inplace = True)
 
 #Convert to json for plotting
 df_map_json = json.loads(df_map.to_json())
 json_map = json.dumps(df_map_json)
 source_map = GeoJSONDataSource(geojson = json_map)
 
-df_cases_tot = df_cases_tot.drop(['Continental Region','Statistical Region','Population'], axis=1).T
-df_cases_tot.reset_index(inplace = True)
-df_cases_tot.rename(columns = {df_cases_tot.columns[0]:'Date'}, inplace=True)
-df_cases_tot['Date'] = pd.to_datetime(df_cases_tot['Date'])
-df_cases_tot['World'] = df_cases_tot.apply(lambda row: row[1 : -1].sum(),axis=1)
-df_cases_tot['ToolTipDate'] = df_cases_tot.Date.map(lambda x: x.strftime("%b %d"))
+# Sum to get world statistics
+df_all = df_who.groupby('Date').sum()
+df_all.reset_index(inplace = True)
+df_all['ToolTipDate'] = df_all.Date.map(lambda x: x.strftime("%b %d"))
+df_all['Country'] = 'World'
+df_all['Population'] = 7776350000
+df_all['Cases_Tot_Rel'] = df_all['Cases_Tot_Abs']/7776350
+df_all['Cases_New_Rel'] = df_all['Cases_New_Abs']/7776350
+df_all['Deaths_Tot_Rel'] = df_all['Deaths_Tot_Abs']/7776350
+df_all['Deaths_New_Rel'] = df_all['Deaths_New_Abs']/7776350
+df_all['Selected'] = df_all['Cases_Tot_Abs']
+df_all['Color'] = Category20_16[0]
 
-df_cases_new = df_cases_new.drop(['Continental Region','Statistical Region','Population'], axis=1).T
-df_cases_new.reset_index(inplace = True)
-df_cases_new.rename(columns = {df_cases_new.columns[0]:'Date'}, inplace=True)
-df_cases_new['Date'] = pd.to_datetime(df_cases_new['Date'])
-df_cases_new['World'] = df_cases_new.apply(lambda row: row[1 : -1].sum(),axis=1)
-df_cases_new['ToolTipDate'] = df_cases_new.Date.map(lambda x: x.strftime("%b %d"))
-
-df_deaths_tot = df_deaths_tot.drop(['Continental Region','Statistical Region','Population'], axis=1).T
-df_deaths_tot.reset_index(inplace = True)
-df_deaths_tot.rename(columns = {df_deaths_tot.columns[0]:'Date'}, inplace=True)
-df_deaths_tot['Date'] = pd.to_datetime(df_deaths_tot['Date'])
-df_deaths_tot['World'] = df_deaths_tot.apply(lambda row: row[1 : -1].sum(),axis=1)
-df_deaths_tot['ToolTipDate'] = df_deaths_tot.Date.map(lambda x: x.strftime("%b %d"))
-
-df_deaths_new = df_deaths_new.drop(['Continental Region','Statistical Region','Population'], axis=1).T
-df_deaths_new.reset_index(inplace = True)
-df_deaths_new.rename(columns = {df_deaths_new.columns[0]:'Date'}, inplace=True)
-df_deaths_new['Date'] = pd.to_datetime(df_deaths_new['Date'])
-df_deaths_new['World'] = df_deaths_new.apply(lambda row: row[1 : -1].sum(),axis=1)
-df_deaths_new['ToolTipDate'] = df_deaths_new.Date.map(lambda x: x.strftime("%b %d"))
-
-df_grp = df_cases_tot[['Date', 'ToolTipDate']].copy()
-df_grp['Country'] = 'World'
-df_grp['Population'] = 7776350000
-df_grp['Cases_Tot_Abs'] = df_cases_tot['World']
-df_grp['Cases_New_Abs'] = df_cases_new['World']
-df_grp['Cases_Tot_Rel'] = df_cases_tot['World']/7776350
-df_grp['Cases_New_Rel'] = df_cases_new['World']/7776350
-df_grp['Deaths_Tot_Abs'] = df_deaths_tot['World']
-df_grp['Deaths_New_Abs'] = df_deaths_new['World']
-df_grp['Deaths_Tot_Rel'] = df_deaths_tot['World']/7776350
-df_grp['Deaths_New_Rel'] = df_deaths_new['World']/7776350
-df_grp['Selected'] = df_grp['Cases_Tot_Abs']
-df_grp['Color'] = Category20_16[0]
-df_grp = df_grp.sort_values(['Country', 'Date'])
+df_grp = df_all.copy()
 source_grp = ColumnDataSource(df_grp)
-
-sum_population = df_grp[df_grp['Date'] == show_dt]['Population'].sum()
-sum_cases_tot_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Abs'].sum()
-sum_cases_new_abs = df_grp[df_grp['Date'] == show_dt]['Cases_New_Abs'].sum()
-sum_cases_tot_rel = 1000*sum_cases_tot_abs/sum_population
-sum_cases_new_rel = 1000*sum_cases_new_abs/sum_population
-sum_deaths_tot_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Abs'].sum()
-sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
-sum_deaths_tot_rel = 1000*sum_deaths_tot_abs/sum_population
-sum_deaths_new_rel = 1000*sum_deaths_new_abs/sum_population
 
 #Define a sequential multi-hue color palette.
 palette = brewer['YlGnBu'][9]
 
 #Reverse color order so that dark blue is highest obesity.
 palette = palette[::-1]
+
+def get_stats():
+    sum_population = df_grp[df_grp['Date'] == show_dt]['Population'].sum()
+    sum_cases_tot_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Abs'].sum()
+    sum_cases_new_abs = df_grp[df_grp['Date'] == show_dt]['Cases_New_Abs'].sum()
+    sum_cases_tot_rel = 1000*sum_cases_tot_abs/sum_population
+    sum_cases_new_rel = 1000*sum_cases_new_abs/sum_population
+    sum_deaths_tot_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Abs'].sum()
+    sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
+    sum_deaths_tot_rel = 1000*sum_deaths_tot_abs/sum_population
+    sum_deaths_new_rel = 1000*sum_deaths_new_abs/sum_population
+
+    my_stats = dict(stat=['Tot Cases', 'New Cases', 'Tot Deaths', 'New Deaths'],
+                    vabs=[sum_cases_tot_abs, sum_cases_new_abs, sum_deaths_tot_abs, sum_deaths_new_abs],
+                    vrel=[my_format(sum_cases_tot_rel), my_format(sum_cases_new_rel),
+                          my_format(sum_deaths_tot_rel), my_format(sum_deaths_new_rel)])
+    return my_stats
+
 
 custom=CustomJSHover(code="""
                      if (value==0) {
@@ -270,39 +272,27 @@ def make_log():
 # Define the callback function: update_map
 def update_map(attr, old, new):
     global show_dt
-    show_dt = slider.value_as_date.strftime("%Y-%m-%d")
+    show_dt = pd.to_datetime(slider.value_as_date)
     if slider.value_as_datetime > first_dt:
-        prev_dt = (slider.value_as_date - timedelta(1)).strftime("%Y-%m-%d")
+        prev_dt = (pd.to_datetime(slider.value_as_date) - timedelta(1))
     else:
         prev_dt = show_dt
     dt_span.update(location=slider.value_as_date)
+    
+    source_out.data = get_stats()
 
-    sum_population = df_grp[df_grp['Date'] == show_dt]['Population'].sum()
-    sum_cases_tot_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Abs'].sum()
-    sum_cases_new_abs = df_grp[df_grp['Date'] == show_dt]['Cases_New_Abs'].sum()
-    sum_cases_tot_rel = 1000*sum_cases_tot_abs/sum_population
-    sum_cases_new_rel = 1000*sum_cases_new_abs/sum_population
-    sum_deaths_tot_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Abs'].sum()
-    sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
-    sum_deaths_tot_rel = 1000*sum_deaths_tot_abs/sum_population
-    sum_deaths_new_rel = 1000*sum_deaths_new_abs/sum_population
-    
-    source_out.data = dict(stat=['Tot Cases', 'New Cases', 'Tot Deaths', 'New Deaths'],
-                           vabs=[sum_cases_tot_abs, sum_cases_new_abs, sum_deaths_tot_abs, sum_deaths_new_abs],
-                           vrel=[my_format(sum_cases_tot_rel), my_format(sum_cases_new_rel),
-                                 my_format(sum_deaths_tot_rel), my_format(sum_deaths_new_rel)])
-    
-    df_map['Population'] = df_cases_map['Population']
-    df_map['Cases_Tot_Abs'] = df_cases_map[show_dt]
-    df_map['Cases_New_Abs'] = df_cases_map[show_dt]-df_cases_map[prev_dt]
-    df_map['Cases_Tot_Rel'] = 1000*df_cases_map[show_dt]/df_cases_map['Population']
-    df_map['Cases_New_Rel'] = 1000*(df_cases_map[show_dt]-df_cases_map[prev_dt])/df_cases_map['Population']
-    df_map['Deaths_Tot_Abs'] = df_deaths_map[show_dt]
-    df_map['Deaths_New_Abs'] = df_deaths_map[show_dt]-df_deaths_map[prev_dt]
-    df_map['Deaths_Tot_Rel'] = 1000*df_deaths_map[show_dt]/df_deaths_map['Population']
-    df_map['Deaths_New_Rel'] = 1000*(df_deaths_map[show_dt]-df_deaths_map[prev_dt])/df_deaths_map['Population']
+    # Build results map
+    df_map = df_geo.copy()
+    df_tmp = df_who[df_who['Date'] == show_dt][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs']]
+    df_map = df_map.merge(df_tmp, left_on = 'Country', right_on = 'Country', how = 'left')
+    df_map['Cases_Tot_Rel'] = 1000*df_map['Cases_Tot_Abs']/df_map['Population']
+    df_map['Cases_New_Rel'] = 1000*df_map['Cases_New_Abs']/df_map['Population']
+    df_map['Deaths_Tot_Rel'] = 1000*df_map['Deaths_Tot_Abs']/df_map['Population']
+    df_map['Deaths_New_Rel'] = 1000*df_map['Deaths_New_Abs']/df_map['Population']
     df_map['Selected'] = df_map[plot_var[sel_var]]
+    df_map.fillna(0, inplace = True)
 
+    #Convert to json for plotting
     df_map_json = json.loads(df_map.to_json())
     json_map = json.dumps(df_map_json)
     source_map.geojson = json_map
@@ -316,7 +306,7 @@ def update_plot(attr, old, new):
         old_list.sort()
         new_list = []
         for i,  selected_index in enumerate(source_map.selected.indices):
-            new_list = new_list + list(df_cases_map['Country'][df_cases_map['Country'] == df_cases_map.iloc[selected_index]['Country']].index)
+            new_list = new_list + list(df_map['Country'][df_map['Country'] == df_map.iloc[selected_index]['Country']].index)
 
         new_list = list(set(new_list))
         new_list.sort()
@@ -331,21 +321,17 @@ def update_plot(attr, old, new):
         color_index = 0
         prev_country = 'World'
         for i, selected_index in enumerate(source_map.selected.indices):
-            selected_country = df_cases_map.iloc[selected_index]['Country']
+            selected_country = df_map.iloc[selected_index]['Country']
             if selected_country != prev_country:
                 prev_country = selected_country
-                pop_country = df_cases_map.iloc[selected_index]['Population']
-                df_sel = df_cases_tot[['Date', 'ToolTipDate']].copy()
+                pop_country = df_map.iloc[selected_index]['Population']
+                df_sel = df_who[df_who['Country'] == selected_country].copy()
                 df_sel['Country'] = selected_country
                 df_sel['Population'] = pop_country
-                df_sel['Cases_Tot_Abs'] = df_cases_tot[selected_country]
-                df_sel['Cases_New_Abs'] = df_cases_new[selected_country]
-                df_sel['Cases_Tot_Rel'] = 1000*df_cases_tot[selected_country]/pop_country
-                df_sel['Cases_New_Rel'] = 1000*df_cases_new[selected_country]/pop_country
-                df_sel['Deaths_Tot_Abs'] = df_deaths_tot[selected_country]
-                df_sel['Deaths_New_Abs'] = df_deaths_new[selected_country]
-                df_sel['Deaths_Tot_Rel'] = 1000*df_deaths_tot[selected_country]/pop_country
-                df_sel['Deaths_New_Rel'] = 1000*df_deaths_new[selected_country]/pop_country
+                df_sel['Cases_Tot_Rel'] = 1000*df_sel['Cases_Tot_Abs']/pop_country
+                df_sel['Cases_New_Rel'] = 1000*df_sel['Cases_New_Abs']/pop_country
+                df_sel['Deaths_Tot_Rel'] = 1000*df_sel['Deaths_Tot_Abs']/pop_country
+                df_sel['Deaths_New_Rel'] = 1000*df_sel['Deaths_New_Abs']/pop_country
                 df_sel['Selected'] = df_sel[plot_var[sel_var]]
                 df_sel['Color'] = Category20_16[color_index]
                 color_index = color_index + 1
@@ -355,36 +341,11 @@ def update_plot(attr, old, new):
         source_grp.data = df_grp
 
     except IndexError:
-        df_grp = df_cases_tot[['Date', 'ToolTipDate']].copy()
-        df_grp['Country'] = 'World'
-        df_grp['Population'] = 7776350000
-        df_grp['Cases_Tot_Abs'] = df_cases_tot['World']
-        df_grp['Cases_New_Abs'] = df_cases_new['World']
-        df_grp['Cases_Tot_Rel'] = df_cases_tot['World']/7776350
-        df_grp['Cases_New_Rel'] = df_cases_new['World']/7776350
-        df_grp['Deaths_Tot_Abs'] = df_deaths_tot['World']
-        df_grp['Deaths_New_Abs'] = df_deaths_new['World']
-        df_grp['Deaths_Tot_Rel'] = df_deaths_tot['World']/7776350
-        df_grp['Deaths_New_Rel'] = df_deaths_new['World']/7776350
+        df_grp = df_all.copy()
         df_grp['Selected'] = df_grp[plot_var[sel_var]]
-        df_grp['Color'] = Category20_16[0]
-        df_grp = df_grp.sort_values(['Country', 'Date'])
         source_grp.data = df_grp
-
-    sum_population = df_grp[df_grp['Date'] == show_dt]['Population'].sum()
-    sum_cases_tot_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Abs'].sum()
-    sum_cases_new_abs = df_grp[df_grp['Date'] == show_dt]['Cases_New_Abs'].sum()
-    sum_cases_tot_rel = 1000*sum_cases_tot_abs/sum_population
-    sum_cases_new_rel = 1000*sum_cases_new_abs/sum_population
-    sum_deaths_tot_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Abs'].sum()
-    sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
-    sum_deaths_tot_rel = 1000*sum_deaths_tot_abs/sum_population
-    sum_deaths_new_rel = 1000*sum_deaths_tot_abs/sum_population
     
-    source_out.data = dict(stat=['Tot Cases', 'New Cases', 'Tot Deaths', 'New Deaths'],
-                           vabs=[sum_cases_tot_abs, sum_cases_new_abs, sum_deaths_tot_abs, sum_deaths_new_abs],
-                           vrel=[my_format(sum_cases_tot_rel), my_format(sum_cases_new_rel),
-                                 my_format(sum_deaths_tot_rel), my_format(sum_deaths_new_rel)])
+    source_out.data = get_stats()
     
 def change_var(attr, old, new):
     curdoc().clear()
@@ -423,8 +384,8 @@ def change_var(attr, old, new):
 def animate_update():
     global show_dt
     slider.value = slider.value_as_date + timedelta(1)
-    show_dt = slider.value_as_date.strftime("%Y-%m-%d")
-    if last_dt.date() == slider.value_as_date:
+    show_dt = pd.to_datetime(slider.value_as_date)
+    if last_dt == pd.to_datetime(slider.value_as_date):
         animate()
 
 callback_id = None
@@ -517,11 +478,7 @@ dt_span = Span(location=slider.value_as_date, dimension='height', line_color='re
 source_map.selected.on_change('indices', update_plot)
 
 # Make a set of labels to show some totals on the map
-data_out = dict(stat=['Tot Cases', 'New Cases', 'Tot Deaths', 'New Deaths'],
-                vabs=[sum_cases_tot_abs, sum_cases_new_abs, sum_deaths_tot_abs, sum_deaths_new_abs],
-                vrel=[my_format(sum_cases_tot_rel), my_format(sum_cases_new_rel),
-                      my_format(sum_deaths_tot_rel), my_format(sum_deaths_new_rel)])
-source_out = ColumnDataSource(data_out)
+source_out = ColumnDataSource(get_stats())
 columns_out = [TableColumn(field='stat', title="Statistic"),
                TableColumn(field='vabs', title="Per Region"),
                TableColumn(field='vrel', title="Per Capita")]
