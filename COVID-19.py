@@ -113,8 +113,6 @@ df_deaths_map = df_geo.merge(df_deaths_tot, left_on = 'Country', right_on = 'Cou
 df_cases_map.fillna(0, inplace = True)
 df_deaths_map.fillna(0, inplace = True)
 
-df_cases_map.to_csv('test.csv')
-
 # Build results map
 df_map = df_geo.copy()
 df_map['Cases_Tot_Abs'] = df_cases_map[show_dt]
@@ -127,8 +125,6 @@ df_map['Deaths_Tot_Rel'] = 1000*df_map['Deaths_Tot_Abs']/df_map['Population']
 df_map['Deaths_New_Rel'] = 1000*df_map['Deaths_New_Abs']/df_map['Population']
 df_map['Selected'] = df_map['Cases_Tot_Abs']
 
-df_map.to_csv('test2.csv')
-
 #Convert to json for plotting
 df_map_json = json.loads(df_map.to_json())
 json_map = json.dumps(df_map_json)
@@ -137,28 +133,24 @@ source_map = GeoJSONDataSource(geojson = json_map)
 df_cases_tot = df_cases_tot.T
 df_cases_tot.reset_index(inplace = True)
 df_cases_tot.rename(columns = {df_cases_tot.columns[0]:'Date'}, inplace=True)
-#df_cases_tot['Date'] = pd.to_datetime(df_cases_tot['Date'])
 df_cases_tot['World'] = df_cases_tot.apply(lambda row: row[1 : -1].sum(),axis=1)
 df_cases_tot['ToolTipDate'] = df_cases_tot.Date.map(lambda x: x.strftime("%b %d"))
 
 df_cases_new = df_cases_new.T
 df_cases_new.reset_index(inplace = True)
 df_cases_new.rename(columns = {df_cases_new.columns[0]:'Date'}, inplace=True)
-#df_cases_new['Date'] = pd.to_datetime(df_cases_new['Date'])
 df_cases_new['World'] = df_cases_new.apply(lambda row: row[1 : -1].sum(),axis=1)
 df_cases_new['ToolTipDate'] = df_cases_new.Date.map(lambda x: x.strftime("%b %d"))
 
 df_deaths_tot = df_deaths_tot.T
 df_deaths_tot.reset_index(inplace = True)
 df_deaths_tot.rename(columns = {df_deaths_tot.columns[0]:'Date'}, inplace=True)
-#df_deaths_tot['Date'] = pd.to_datetime(df_deaths_tot['Date'])
 df_deaths_tot['World'] = df_deaths_tot.apply(lambda row: row[1 : -1].sum(),axis=1)
 df_deaths_tot['ToolTipDate'] = df_deaths_tot.Date.map(lambda x: x.strftime("%b %d"))
 
 df_deaths_new = df_deaths_new.T
 df_deaths_new.reset_index(inplace = True)
 df_deaths_new.rename(columns = {df_deaths_new.columns[0]:'Date'}, inplace=True)
-#df_deaths_new['Date'] = pd.to_datetime(df_deaths_new['Date'])
 df_deaths_new['World'] = df_deaths_new.apply(lambda row: row[1 : -1].sum(),axis=1)
 df_deaths_new['ToolTipDate'] = df_deaths_new.Date.map(lambda x: x.strftime("%b %d"))
 
