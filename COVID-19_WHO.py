@@ -9,21 +9,17 @@ from bokeh.layouts import row, column
 from datetime import timedelta, date, datetime
 import geopandas as gpd
 import json
+import numpy as np
 import pandas as pd
 
+callback_id = None
+
 ##################################################
-# Get the WHO data from disk
+# Function to get the WHO data from disk
 ##################################################
 
-draw_sub_unit = ['Greenland', 'French Southern and Antarctic Lands', 'New Caledonia', 'Falkland Islands', 'Puerto Rico']
-
-def get_who(location):
-    df = pd.read_csv(location, encoding='utf-8', error_bad_lines=False)
-
-    #for i, index_this in enumerate(df.index[df['Province/State'].notnull()].tolist()):
-    #    country = df.iloc[index_this,1]
-    #    if country != 'Australia' and country != 'Canada' and country != 'China' and df.iloc[index_this,0] in draw_sub_unit:
-    #        df.iloc[index_this,1] = df.iloc[index_this,0]
+def get_who(resolution):
+    df = pd.read_csv('WHO-COVID-19-global-data.csv', encoding='utf-8', error_bad_lines=False)
 
     df.drop(df.columns[[1,3]], axis=1, inplace=True)
     df.rename(columns = {df.columns[0]:'Date', df.columns[1]:'Country', df.columns[2]:'Deaths_New_Abs', df.columns[3]:'Deaths_Tot_Abs', df.columns[4]:'Cases_New_Abs', df.columns[5]:'Cases_Tot_Abs'}, inplace=True)
@@ -55,78 +51,42 @@ def get_who(location):
     df['Country'] = df['Country'].str.replace('Timor-Leste','East Timor')
     df['Country'] = df['Country'].str.replace('Viet Nam','Vietnam')
 
+    for i, index_this in enumerate(df_sub.index[np.where((df_sub[resolution] == 'No') & (df_sub['Subunit'] != df_sub['Country']), True, False)].tolist()):
+        df['Country'] = df['Country'].str.replace(df_sub.iloc[index_this,0],df_sub.iloc[index_this,1])
+    
+    df = df.groupby(['Date','Country']).sum()
+    df = df.sort_values(['Country', 'Date'])
+    df.reset_index(inplace = True)
+
     return df
 
-df_who = get_who('WHO-COVID-19-global-data.csv')
-
-first_dt = min(df_who['Date'])
-last_dt = max(df_who['Date'])
-prev_dt = (last_dt - timedelta(1))
-show_dt = last_dt
-
 ##################################################
-# Plot world map using geopandas
+# Function to get shapes using geopandas
 ##################################################
 
-geofile = '/home/martel/.local/share/cartopy/shapefiles/natural_earth/cultural/ne_110m_admin_0_countries.shp'
+def get_geo(resolution):
+    geofile = 'ne_' + resolution + '_admin_0_countries.shp'
 
-df_geo = gpd.read_file(geofile)[['ADMIN', 'ADM0_A3', 'geometry']]
-df_geo.columns = ['Country','Code','geometry']
+    df = gpd.read_file(geofile)[['ADMIN', 'ADM0_A3', 'geometry']]
+    df.columns = ['Country','Code','geometry']
 
-# 2019 update of Macedonia to North Macedonia
-df_geo['Country'] = df_geo['Country'].str.replace('Macedonia','North Macedonia')
+    # 2019 update of Macedonia to North Macedonia
+    df['Country'] = df['Country'].str.replace('Macedonia','North Macedonia')
 
-# Specific for JHU, includes Puerto Rico as part of US
-#df_geo['Country'] = df_geo['Country'].str.replace('Puerto Rico','United States of America')
+    # Specific for JHU, includes Puerto Rico as part of US
+    #df['Country'] = df['Country'].str.replace('Puerto Rico','United States of America')
 
-# Remove Antarctica
-df_geo.drop([159], inplace = True)
-#df_geo.drop([239], inplace = True)
+    # Remove Antarctica
+    df.drop(df[df['Country'] == 'Antarctica'].index, inplace = True)
 
-df_countries = pd.read_csv('Countries.csv', encoding='utf-8')[['Country', 'Population']]
-df_geo = df_geo.merge(df_countries, left_on = 'Country', right_on = 'Country', how = 'left')
+    df_countries = pd.read_csv('Countries.csv', encoding='utf-8')[['Country', 'Population']]
+    df = df.merge(df_countries, left_on = 'Country', right_on = 'Country', how = 'left')
 
-# Fix multipolygon rendering (though now selecting a polygon does not select the other parts)
-df_geo = df_geo.explode()
-df_geo.reset_index(inplace = True)
+    # Fix multipolygon rendering (though now selecting a polygon does not select the other parts)
+    df = df.explode()
+    df.reset_index(inplace = True)
 
-# Build results map
-df_map = df_geo.copy()
-df_tmp = df_who[df_who['Date'] == show_dt][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs']]
-df_map = df_map.merge(df_tmp, left_on = 'Country', right_on = 'Country', how = 'left')
-df_map['Cases_Tot_Rel'] = 1000*df_map['Cases_Tot_Abs']/df_map['Population']
-df_map['Cases_New_Rel'] = 1000*df_map['Cases_New_Abs']/df_map['Population']
-df_map['Deaths_Tot_Rel'] = 1000*df_map['Deaths_Tot_Abs']/df_map['Population']
-df_map['Deaths_New_Rel'] = 1000*df_map['Deaths_New_Abs']/df_map['Population']
-df_map['Selected'] = df_map['Cases_Tot_Abs']
-df_map.fillna(0, inplace = True)
-
-#Convert to json for plotting
-df_map_json = json.loads(df_map.to_json())
-json_map = json.dumps(df_map_json)
-source_map = GeoJSONDataSource(geojson = json_map)
-
-# Sum to get world statistics
-df_all = df_who.groupby('Date').sum()
-df_all.reset_index(inplace = True)
-df_all['ToolTipDate'] = df_all.Date.map(lambda x: x.strftime("%b %d"))
-df_all['Country'] = 'World'
-df_all['Population'] = 7776350000
-df_all['Cases_Tot_Rel'] = df_all['Cases_Tot_Abs']/7776350
-df_all['Cases_New_Rel'] = df_all['Cases_New_Abs']/7776350
-df_all['Deaths_Tot_Rel'] = df_all['Deaths_Tot_Abs']/7776350
-df_all['Deaths_New_Rel'] = df_all['Deaths_New_Abs']/7776350
-df_all['Selected'] = df_all['Cases_Tot_Abs']
-df_all['Color'] = Category20_16[0]
-
-df_grp = df_all.copy()
-source_grp = ColumnDataSource(df_grp)
-
-#Define a sequential multi-hue color palette.
-palette = brewer['YlGnBu'][9]
-
-#Reverse color order so that dark blue is highest obesity.
-palette = palette[::-1]
+    return df
 
 def get_stats():
     sum_population = df_grp[df_grp['Date'] == show_dt]['Population'].sum()
@@ -388,8 +348,6 @@ def animate_update():
     if last_dt == pd.to_datetime(slider.value_as_date):
         animate()
 
-callback_id = None
-
 def animate():
     global callback_id
     if button.label == '► Play':
@@ -402,6 +360,62 @@ def animate():
         slider.remove_on_change('value', update_map)
         button.label = '► Play'
         curdoc().remove_periodic_callback(callback_id)
+
+##################################################
+# Main code
+##################################################
+
+##################################################
+# Get subunits for countries to merge
+##################################################
+df_sub = pd.read_csv('Subunits_and_small_shapes.csv', encoding='utf-8', error_bad_lines=False)
+
+df_who = get_who('110m')
+
+first_dt = min(df_who['Date'])
+last_dt = max(df_who['Date'])
+prev_dt = (last_dt - timedelta(1))
+show_dt = last_dt
+
+df_geo = get_geo('110m')
+
+# Build results map
+df_map = df_geo.copy()
+df_tmp = df_who[df_who['Date'] == show_dt][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs']]
+df_map = df_map.merge(df_tmp, left_on = 'Country', right_on = 'Country', how = 'left')
+df_map['Cases_Tot_Rel'] = 1000*df_map['Cases_Tot_Abs']/df_map['Population']
+df_map['Cases_New_Rel'] = 1000*df_map['Cases_New_Abs']/df_map['Population']
+df_map['Deaths_Tot_Rel'] = 1000*df_map['Deaths_Tot_Abs']/df_map['Population']
+df_map['Deaths_New_Rel'] = 1000*df_map['Deaths_New_Abs']/df_map['Population']
+df_map['Selected'] = df_map['Cases_Tot_Abs']
+df_map.fillna(0, inplace = True)
+
+#Convert to json for plotting
+df_map_json = json.loads(df_map.to_json())
+json_map = json.dumps(df_map_json)
+source_map = GeoJSONDataSource(geojson = json_map)
+
+# Sum to get world statistics
+df_all = df_who.groupby('Date').sum()
+df_all.reset_index(inplace = True)
+df_all['ToolTipDate'] = df_all.Date.map(lambda x: x.strftime("%b %d"))
+df_all['Country'] = 'World'
+df_all['Population'] = 7776350000
+df_all['Cases_Tot_Rel'] = df_all['Cases_Tot_Abs']/7776350
+df_all['Cases_New_Rel'] = df_all['Cases_New_Abs']/7776350
+df_all['Deaths_Tot_Rel'] = df_all['Deaths_Tot_Abs']/7776350
+df_all['Deaths_New_Rel'] = df_all['Deaths_New_Abs']/7776350
+df_all['Selected'] = df_all['Cases_Tot_Abs']
+df_all['Color'] = Category20_16[0]
+
+df_grp = df_all.copy()
+source_grp = ColumnDataSource(df_grp)
+
+#Define a sequential multi-hue color palette.
+palette = brewer['YlGnBu'][9]
+
+#Reverse color order so that dark blue is highest obesity.
+palette = palette[::-1]
 
 # Make a selection of what to plot
 plot_title = ['Tot Cases', 'New Cases', 'Tot Cases/1k Ppl', 'New Cases/1k Ppl',
