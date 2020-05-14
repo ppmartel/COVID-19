@@ -2,7 +2,7 @@ from bokeh.io import curdoc, output_file, show
 from bokeh.plotting import figure
 from bokeh.models import ColumnDataSource, GeoJSONDataSource, LinearColorMapper, LogColorMapper, ColorBar
 from bokeh.models import Div, HoverTool, RadioButtonGroup, Button, DateSlider, Span, Toggle
-from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, BasicTicker, LogTicker, CustomJSHover
+from bokeh.models import DatetimeTickFormatter, PrintfTickFormatter, NumeralTickFormatter, BasicTicker, LogTicker, CustomJSHover
 from bokeh.models import DataTable, TableColumn
 from bokeh.palettes import brewer, Category20_16
 from bokeh.layouts import row, column
@@ -94,10 +94,10 @@ def get_map(date):
     df_map = df_geo.copy()
     df_tmp = df_who[df_who['Date'] == date][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs']]
     df_map = df_map.merge(df_tmp, left_on = 'Country', right_on = 'Country', how = 'left')
-    df_map['Cases_Tot_Rel'] = 1000*df_map['Cases_Tot_Abs']/df_map['Population']
-    df_map['Cases_New_Rel'] = 1000*df_map['Cases_New_Abs']/df_map['Population']
-    df_map['Deaths_Tot_Rel'] = 1000*df_map['Deaths_Tot_Abs']/df_map['Population']
-    df_map['Deaths_New_Rel'] = 1000*df_map['Deaths_New_Abs']/df_map['Population']
+    df_map['Cases_Tot_Rel'] = 100000*df_map['Cases_Tot_Abs']/df_map['Population']
+    df_map['Cases_New_Rel'] = 100000*df_map['Cases_New_Abs']/df_map['Population']
+    df_map['Deaths_Tot_Rel'] = 100000*df_map['Deaths_Tot_Abs']/df_map['Population']
+    df_map['Deaths_New_Rel'] = 100000*df_map['Deaths_New_Abs']/df_map['Population']
     df_map['Selected'] = df_map[plot_var[sel_var]]
     df_map.fillna(0, inplace = True)
 
@@ -110,12 +110,12 @@ def get_stats():
     sum_population = df_grp[df_grp['Date'] == show_dt]['Population'].sum()
     sum_cases_tot_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Abs'].sum()
     sum_cases_new_abs = df_grp[df_grp['Date'] == show_dt]['Cases_New_Abs'].sum()
-    sum_cases_tot_rel = 1000*sum_cases_tot_abs/sum_population
-    sum_cases_new_rel = 1000*sum_cases_new_abs/sum_population
+    sum_cases_tot_rel = 100000*sum_cases_tot_abs/sum_population
+    sum_cases_new_rel = 100000*sum_cases_new_abs/sum_population
     sum_deaths_tot_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Abs'].sum()
     sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
-    sum_deaths_tot_rel = 1000*sum_deaths_tot_abs/sum_population
-    sum_deaths_new_rel = 1000*sum_deaths_new_abs/sum_population
+    sum_deaths_tot_rel = 100000*sum_deaths_tot_abs/sum_population
+    sum_deaths_new_rel = 100000*sum_deaths_new_abs/sum_population
 
     my_stats = dict(stat=['Tot Cases', 'New Cases', 'Tot Deaths', 'New Deaths'],
                     vabs=[sum_cases_tot_abs, sum_cases_new_abs, sum_deaths_tot_abs, sum_deaths_new_abs],
@@ -129,8 +129,8 @@ custom=CustomJSHover(code="""
                          return ""
                      }
                      var modified;
-                     var SI_SYMBOL = ["", "k", "M", "B", "T"];
-                     modified = 1000/value;
+                     var SI_SYMBOL = ["", "k", "m", "b", "t"];
+                     modified = 100000/value;
                      
                      // what tier? (determines SI symbol)
                      var tier = Math.log10(modified) / 3 | 0;
@@ -152,12 +152,12 @@ custom=CustomJSHover(code="""
 def my_format(num):
     if num == 0:
         return '0'
-    num = float('{:.3g}'.format(1000/num))
+    num = float('{:.3g}'.format(100000/num))
     magnitude = 0
     while abs(num) >= 1000:
         magnitude += 1
         num /= 1000.0
-    return '1/{}{} Ppl'.format('{:f}'.format(num).rstrip('0').rstrip('.'), ['', 'k', 'M', 'B', 'T'][magnitude])
+    return '1/{}{} Ppl'.format('{:f}'.format(num).rstrip('0').rstrip('.'), ['', 'k', 'm', 'b', 't'][magnitude])
 
 # Make the map
 def make_map():
@@ -171,15 +171,19 @@ def make_map():
     # Choose linear or logarithmic color mapper
     if tog_lin.active:
         mapper = LinearColorMapper(palette = palette, low = 0, high = plot_max[sel_var])
-        color_bar = ColorBar(color_mapper = mapper, label_standoff = 8, height = 20, #width = 500, 
-                             border_line_color = None, location = (0,0), orientation = 'horizontal', 
-                             ticker = BasicTicker(), major_label_overrides = tick_lin[sel_var])
+        ticker = BasicTicker()
     else:
         mapper = LogColorMapper(palette = palette, low = plot_min[sel_var], high = plot_max[sel_var])
-        color_bar = ColorBar(color_mapper = mapper, label_standoff = 8, height = 20, #width = 500, 
-                             border_line_color = None, location = (0,0), orientation = 'horizontal', 
-                             ticker = LogTicker(), major_label_overrides = tick_log[sel_var])
-    
+        ticker = LogTicker()
+
+    color_bar = ColorBar(color_mapper = mapper, label_standoff = 8, height = 20,  ticker = ticker,
+                         border_line_color = None, location = (0,0), orientation = 'horizontal') 
+
+    if not rb_abs_rel.active:
+        color_bar.formatter = NumeralTickFormatter(format='0[.]0a')
+    elif not tog_lin.active:
+        color_bar.formatter = NumeralTickFormatter(format='0.[00000]')
+        
     #Add patch renderer to figure. 
     ren_map = p.patches('xs', 'ys', source = source_map, line_color = 'black', line_width = 0.25,
                         fill_color = {'field' : 'Selected', 'transform' : mapper}, fill_alpha = 1)
@@ -286,10 +290,10 @@ def update_plot(attr, old, new):
                 df_sel = df_who[df_who['Country'] == selected_country].copy()
                 df_sel['Country'] = selected_country
                 df_sel['Population'] = pop_country
-                df_sel['Cases_Tot_Rel'] = 1000*df_sel['Cases_Tot_Abs']/pop_country
-                df_sel['Cases_New_Rel'] = 1000*df_sel['Cases_New_Abs']/pop_country
-                df_sel['Deaths_Tot_Rel'] = 1000*df_sel['Deaths_Tot_Abs']/pop_country
-                df_sel['Deaths_New_Rel'] = 1000*df_sel['Deaths_New_Abs']/pop_country
+                df_sel['Cases_Tot_Rel'] = 100000*df_sel['Cases_Tot_Abs']/pop_country
+                df_sel['Cases_New_Rel'] = 100000*df_sel['Cases_New_Abs']/pop_country
+                df_sel['Deaths_Tot_Rel'] = 100000*df_sel['Deaths_Tot_Abs']/pop_country
+                df_sel['Deaths_New_Rel'] = 100000*df_sel['Deaths_New_Abs']/pop_country
                 df_sel['Selected'] = df_sel[plot_var[sel_var]]
                 df_sel['Color'] = Category20_16[color_index]
                 color_index = color_index + 1
@@ -393,7 +397,7 @@ tog_res.on_change('active', change_res)
 rb_cases_deaths = RadioButtonGroup(labels=['Cases', 'Deaths'], active=0, height = 30)
 rb_cases_deaths.on_change('active', change_var)
 
-rb_abs_rel = RadioButtonGroup(labels=['Per Region', 'Per 1k Ppl'], active=0, height = 30)
+rb_abs_rel = RadioButtonGroup(labels=['Per Region', 'Per 100k'], active=0, height = 30)
 rb_abs_rel.on_change('active', change_var)
 
 rb_tot_new = RadioButtonGroup(labels=['Total', 'New'], active=0, height = 30)
@@ -402,8 +406,8 @@ rb_tot_new.on_change('active', change_var)
 sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
 
 # Make a selection of what to plot
-plot_title = ['Tot Cases', 'New Cases', 'Tot Cases/1k Ppl', 'New Cases/1k Ppl',
-              'Tot Deaths', 'New Deaths', 'Tot Deaths/1k Ppl', 'New Deaths/1k Ppl']
+plot_title = ['Tot Cases', 'New Cases', 'Tot Cases/100k Ppl', 'New Cases/100k Ppl',
+              'Tot Deaths', 'New Deaths', 'Tot Deaths/100k Ppl', 'New Deaths/100k Ppl']
 plot_var = ['Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel',
             'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel']
 
@@ -428,10 +432,10 @@ df_all.reset_index(inplace = True)
 df_all['ToolTipDate'] = df_all.Date.map(lambda x: x.strftime("%b %d"))
 df_all['Country'] = 'World'
 df_all['Population'] = 7776350000
-df_all['Cases_Tot_Rel'] = df_all['Cases_Tot_Abs']/7776350
-df_all['Cases_New_Rel'] = df_all['Cases_New_Abs']/7776350
-df_all['Deaths_Tot_Rel'] = df_all['Deaths_Tot_Abs']/7776350
-df_all['Deaths_New_Rel'] = df_all['Deaths_New_Abs']/7776350
+df_all['Cases_Tot_Rel'] = df_all['Cases_Tot_Abs']/77763.50
+df_all['Cases_New_Rel'] = df_all['Cases_New_Abs']/77763.50
+df_all['Deaths_Tot_Rel'] = df_all['Deaths_Tot_Abs']/77763.50
+df_all['Deaths_New_Rel'] = df_all['Deaths_New_Abs']/77763.50
 df_all['Selected'] = df_all['Cases_Tot_Abs']
 df_all['Color'] = Category20_16[0]
 
@@ -454,34 +458,6 @@ plot_min = [1, 1, 0.0005, 0.0005, 1, 1, 0.0005, 0.00001]
 plot_max = [max(df_map[plot_var[0]]), max(df_map[plot_var[1]]), max(df_map[plot_var[2]]),
             max(df_map[plot_var[3]]), max(df_map[plot_var[4]]), max(df_map[plot_var[5]]),
             max(df_map[plot_var[6]]), max(df_map[plot_var[7]])]
-tick_lin = [{'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k',
-             '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
-            {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k',
-             '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
-            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333',
-             '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'},
-            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333',
-             '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'},
-            {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k',
-             '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
-            {'0':'0', '50000':'50k', '100000':'100k', '150000':'150k', '200000':'200k', '250000':'250k',
-             '300000':'300k', '350000':'350k', '400000':'400k', '500000':'500k'},
-            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333',
-             '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'},
-            {'0.5':'1/2000', '1':'1/1000', '1.5':'1/666', '2':'1/500', '2.5':'1/400', '3':'1/333',
-             '3.5':'1/286', '4':'1/250', '4.5':'1/222', '5':'1/200'}]
-tick_log = [{'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
-            {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
-            {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k',
-             '1':'1/1k', '10':'1/100', '100':'1/10'},
-            {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k',
-             '1':'1/1k', '10':'1/100', '100':'1/10'},
-            {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
-            {'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '100000':'100k', '1000000':'1M'},
-            {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k',
-             '1':'1/1k', '10':'1/100', '100':'1/10'},
-            {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k',
-             '1':'1/1k', '10':'1/100', '100':'1/10'}]
 
 # Make a selection of the date to plot
 slider = DateSlider(title = 'Date', start = first_dt, end = last_dt, step = 1, value = last_dt,
