@@ -61,20 +61,112 @@ def get_who(resolution):
     return df
 
 ##################################################
+# Function to get the JHU data from the web
+##################################################
+
+def pull_jhu(location, resolution):
+    df = pd.read_csv(location, encoding='utf-8', error_bad_lines=False)
+    
+    df['Province/State'] = df['Province/State'].str.replace('Bonaire, Sint Eustatius and Saba','Caribbean Netherlands')
+    df['Province/State'] = df['Province/State'].str.replace('Curacao','Curaçao')
+    df['Province/State'] = df['Province/State'].str.replace('St Martin','Saint Martin')
+    df['Province/State'] = df['Province/State'].str.replace('\s*\(.*\)','')
+    
+    for i, index_this in enumerate(df.index[df['Province/State'].notnull()].tolist()):
+        country = df.iloc[index_this,1]
+        if country != 'Australia' and country != 'Canada' and country != 'China':# and df.iloc[index_this,0] in draw_sub_unit:
+            df.iloc[index_this,1] = df.iloc[index_this,0]
+            
+    df.drop(df.columns[[0,2,3]], axis=1, inplace=True)
+    df.rename(columns = {df.columns[0]:'Country'}, inplace=True)
+    
+    df['Country'] = df['Country'].str.replace('Burma','Myanmar')
+    df['Country'] = df['Country'].str.replace('Bahamas','The Bahamas')
+    df['Country'] = df['Country'].str.replace('Congo \(Brazzaville\)','Republic of the Congo')
+    df['Country'] = df['Country'].str.replace('Congo \(Kinshasa\)','Democratic Republic of the Congo')
+    df['Country'] = df['Country'].str.replace('.*Ivoire','Ivory Coast')
+    df['Country'] = df['Country'].str.replace('Eswatini', 'eSwatini')
+    df['Country'] = df['Country'].str.replace('Holy See','Vatican')
+    df['Country'] = df['Country'].str.replace('Korea, South', 'South Korea')
+    df['Country'] = df['Country'].str.replace('Reunion','Réunion')
+    df['Country'] = df['Country'].str.replace('Sao Tome and Principe','São Tomé and Príncipe')
+    df['Country'] = df['Country'].str.replace('Serbia','Republic of Serbia')
+    df['Country'] = df['Country'].str.replace('Taiwan\*','Taiwan')
+    df['Country'] = df['Country'].str.replace('Tanzania','United Republic of Tanzania')
+    df['Country'] = df['Country'].str.replace('Timor-Leste','East Timor')
+    df['Country'] = df['Country'].str.replace('US','United States of America')
+    df['Country'] = df['Country'].str.replace('West Bank and Gaza','Palestine')
+
+    for i, index_this in enumerate(df_sub.index[np.where((df_sub[resolution] == 'No') & (df_sub['Subunit'] != df_sub['Country']), True, False)].tolist()):
+        df['Country'] = df['Country'].str.replace(df_sub.iloc[index_this,0],df_sub.iloc[index_this,1])
+    
+    df = df.groupby('Country').sum()
+    
+    df.columns = pd.to_datetime(df.columns).tolist()
+    df.reset_index(inplace = True)
+
+    return df
+
+def get_jhu(resolution):
+    df_cases_tot = pull_jhu('https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv', resolution)
+    df_deaths_tot = pull_jhu('https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv', resolution)
+
+    first_dt = datetime.strptime('2020-01-22',"%Y-%m-%d")
+    last_dt = df_cases_tot.columns[-1]
+    prev_dt = (last_dt - timedelta(1))
+    show_dt = last_dt
+
+    # Make a copy within which the day to day changes are calculated
+    # Probably a better way to do this, but this works for now
+    df_cases_new = df_cases_tot.copy()
+    df_deaths_new = df_deaths_tot.copy()
+    new_dt = last_dt
+    while new_dt > first_dt:
+        df_cases_new[new_dt] = (df_cases_new[new_dt] - df_cases_new[(new_dt - timedelta(1))])
+        df_deaths_new[new_dt] = (df_deaths_new[new_dt] - df_deaths_new[(new_dt - timedelta(1))])
+        new_dt = (new_dt - timedelta(1))
+    df_cases_new[first_dt] = 0
+    df_deaths_new[first_dt] = 0
+
+    df_cases_tot = df_cases_tot.melt(id_vars=['Country'], var_name='Date', value_name='Cases_Tot_Abs')
+    df_cases_new = df_cases_new.melt(id_vars=['Country'], var_name='Date', value_name='Cases_New_Abs')
+    df_deaths_tot = df_deaths_tot.melt(id_vars=['Country'], var_name='Date', value_name='Deaths_Tot_Abs')
+    df_deaths_new = df_deaths_new.melt(id_vars=['Country'], var_name='Date', value_name='Deaths_New_Abs')
+
+    df = df_cases_tot[['Date', 'Country', 'Cases_Tot_Abs']].copy()
+    df['Cases_New_Abs'] = df_cases_new['Cases_New_Abs']
+    df['Deaths_Tot_Abs'] = df_deaths_tot['Deaths_Tot_Abs']
+    df['Deaths_New_Abs'] = df_deaths_new['Deaths_New_Abs']
+    df['ToolTipDate'] = df.Date.map(lambda x: x.strftime("%b %d"))
+    df = df.sort_values(['Country', 'Date'])
+    df.reset_index(inplace = True)
+
+    return df
+
+##################################################
 # Function to get shapes using geopandas
 ##################################################
 
 def get_geo(resolution):
     geofile = 'ne_' + resolution + '_admin_0_countries.shp'
 
-    df = gpd.read_file(geofile)[['ADMIN', 'ADM0_A3', 'geometry']]
-    df.columns = ['Country','Code','geometry']
+    df = gpd.read_file(geofile)[['ADMIN','geometry']]
+    df.columns = ['Country','geometry']
 
     # 2019 update of Macedonia to North Macedonia
     df['Country'] = df['Country'].str.replace('Macedonia','North Macedonia')
 
-    # Specific for JHU, includes Puerto Rico as part of US
-    #df['Country'] = df['Country'].str.replace('Puerto Rico','United States of America')
+    # Specific for JHU
+    if rb_who_jhu.active:
+        # Channel Islands include Guernsey and Jersey
+        df['Country'] = df['Country'].str.replace('Guernsey','Channel Islands')
+        df['Country'] = df['Country'].str.replace('Jersey','Channel Islands')
+        
+        # US includes Guam, Northern Mariana Islands, Puerto Rico, and United States Virgin Islands
+        df['Country'] = df['Country'].str.replace('Guam','United States of America')
+        df['Country'] = df['Country'].str.replace('Northern Mariana Islands','United States of America')
+        df['Country'] = df['Country'].str.replace('Puerto Rico','United States of America')
+        df['Country'] = df['Country'].str.replace('United States Virgin Islands','United States of America')
 
     # Remove Antarctica
     df.drop(df[df['Country'] == 'Antarctica'].index, inplace = True)
@@ -92,7 +184,7 @@ def get_map(date):
     global df_map
     # Build results map
     df_map = df_geo.copy()
-    df_tmp = df_who[df_who['Date'] == date][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs']]
+    df_tmp = df_src[df_src['Date'] == date][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs']]
     df_map = df_map.merge(df_tmp, left_on = 'Country', right_on = 'Country', how = 'left')
     df_map['Cases_Tot_Rel'] = 100000*df_map['Cases_Tot_Abs']/df_map['Population']
     df_map['Cases_New_Rel'] = 100000*df_map['Cases_New_Abs']/df_map['Population']
@@ -162,7 +254,7 @@ def my_format(num):
 # Make the map
 def make_map():
     #Create figure object.
-    p = figure(title = 'Map of COVID-19 '+plot_title[sel_var]+' (WHO)', plot_height = 550 , plot_width = 950, 
+    p = figure(title = 'Map of COVID-19 '+plot_title[sel_var]+' ('+txt_src+')', plot_height = 550 , plot_width = 950, 
                      x_range=(-180, 180), y_range=(-65, 90), toolbar_location = 'above',
                      tools = 'pan, wheel_zoom, box_zoom, reset, tap', sizing_mode="scale_width")
     p.xgrid.grid_line_color = None
@@ -204,7 +296,7 @@ def make_map():
 # Make linear plot
 def make_lin():
     #Create figure object.
-    p = figure(title = 'Lin. Plot of COVID-19 '+plot_title[sel_var]+' (WHO)', toolbar_location = 'above',
+    p = figure(title = 'Lin. Plot of COVID-19 '+plot_title[sel_var]+' ('+txt_src+')', toolbar_location = 'above',
                plot_height = 250, plot_width = 500, x_axis_type = 'datetime', 
                tools = 'pan, wheel_zoom, box_zoom, reset', sizing_mode="scale_width")
 
@@ -227,7 +319,7 @@ def make_lin():
 # Make logarithmic plot
 def make_log():
     #Create figure object.
-    p = figure(title = 'Log. Plot of COVID-19 '+plot_title[sel_var]+' (WHO)',toolbar_location = 'above',
+    p = figure(title = 'Log. Plot of COVID-19 '+plot_title[sel_var]+' ('+txt_src+')',toolbar_location = 'above',
                plot_height = 250, plot_width = 500, x_axis_type = 'datetime', y_axis_type = 'log', 
                tools = 'pan, wheel_zoom, box_zoom, reset', sizing_mode="scale_width")
 
@@ -287,7 +379,7 @@ def update_plot(attr, old, new):
             if selected_country != prev_country:
                 prev_country = selected_country
                 pop_country = df_map.iloc[selected_index]['Population']
-                df_sel = df_who[df_who['Country'] == selected_country].copy()
+                df_sel = df_src[df_src['Country'] == selected_country].copy()
                 df_sel['Country'] = selected_country
                 df_sel['Population'] = pop_country
                 df_sel['Cases_Tot_Rel'] = 100000*df_sel['Cases_Tot_Abs']/pop_country
@@ -311,15 +403,35 @@ def update_plot(attr, old, new):
     
 def change_var(attr, old, new):
     curdoc().clear()
-    
+
+    global df_all
+    global df_grp
     global sel_var
     global source_map
+    global source_grp
 
     sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
+    #old_list = source_map.selected.indices
     source_map = GeoJSONDataSource(geojson = get_map(show_dt))
+    #source_map.selected.indices = old_list
     
-    df_grp['Selected'] = df_grp[plot_var[sel_var]]
-    source_grp.data = df_grp
+    # Sum to get world statistics
+    df_all = df_src.groupby('Date').sum()
+    df_all.reset_index(inplace = True)
+    df_all['ToolTipDate'] = df_all.Date.map(lambda x: x.strftime("%b %d"))
+    df_all['Country'] = 'World'
+    df_all['Population'] = 7776350000
+    df_all['Cases_Tot_Rel'] = df_all['Cases_Tot_Abs']/77763.50
+    df_all['Cases_New_Rel'] = df_all['Cases_New_Abs']/77763.50
+    df_all['Deaths_Tot_Rel'] = df_all['Deaths_Tot_Abs']/77763.50
+    df_all['Deaths_New_Rel'] = df_all['Deaths_New_Abs']/77763.50
+    df_all['Selected'] = df_all['Cases_Tot_Abs']
+    df_all['Color'] = Category20_16[0]
+    
+    df_grp = df_all.copy()
+    #df_grp['Selected'] = df_grp[plot_var[sel_var]]
+    source_grp = ColumnDataSource(df_grp)
+    source_out.data = get_stats()
 
     if rb_cases_deaths.active and rb_tot_new.active:
         hover.tooltips = [('Date','@ToolTipDate'), ('Country/region','@Country'), ('Population','@Population'),
@@ -339,18 +451,39 @@ def change_var(attr, old, new):
                           ('Tot Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}')]
         hover.formatters = {'@Cases_Tot_Rel' : custom}
 
-    curdoc().add_root(row(column(make_map(), row(column(heading, row(button, tog_lin, tog_res, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, table_out, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
+    curdoc().add_root(row(column(make_map(), row(column(heading, row(button, tog_lin, tog_res, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_who_jhu, rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, table_out, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
 
 def change_res(attr, old, new):
-    global df_who
+    global txt_src
+    global df_src
     global df_geo
+    global first_dt
+    global last_dt
+    global show_dt
 
     if tog_res.active:
-        df_who = get_who('50m')
-        df_geo = get_geo('50m')
+        res = '50m'
     else:
-        df_who = get_who('110m')
-        df_geo = get_geo('110m')
+        res = '110m'
+        
+    df_geo = get_geo(res)
+
+    if rb_who_jhu.active:
+        heading.text='Worldwide COVID-19 Statistics - <a href="https://github.com/CSSEGISandData/COVID-19" target="_blank">JHU</a></br>Click on countries (multiple with shift)</br>Created by Phil Martel - <a href="https://github.com/ppmartel/COVID-19" target="_blank">GitHub Repo.</a>'
+        txt_src = 'JHU'
+        df_src = get_jhu(res)
+    else:
+        heading.text='Worldwide COVID-19 Statistics - <a href="https://covid19.who.int/" target="_blank">WHO</a></br>Click on countries (multiple with shift)</br>Created by Phil Martel - <a href="https://github.com/ppmartel/COVID-19" target="_blank">GitHub Repo.</a>'
+        txt_src = 'WHO'
+        df_src = get_who(res)
+
+    first_dt = min(df_src['Date'])
+    last_dt = max(df_src['Date'])
+    slider.start = first_dt
+    slider.end = last_dt
+    if show_dt > last_dt:
+        show_dt = last_dt
+        slider.value = show_dt
 
     change_var(attr, old, new)
 
@@ -379,7 +512,7 @@ def animate():
 ##################################################
              
 # heading fills available width
-heading = Div(text='Worldwide COVID-19 Statistics - <a href="https://www.who.int/emergencies/diseases/novel-coronavirus-2019/situation-reports" target="_blank">WHO</a></br>Click on countries (multiple with shift)</br>Created by Phil Martel - <a href="https://github.com/ppmartel/COVID-19" target="_blank">GitHub Repository</a>',
+heading = Div(text='Worldwide COVID-19 Statistics - <a href="https://covid19.who.int/" target="_blank">WHO</a></br>Click on countries (multiple with shift)</br>Created by Phil Martel - <a href="https://github.com/ppmartel/COVID-19" target="_blank">GitHub Repo.</a>',
               style={'background-color':'#c8cfd6', 'outline':'black solid thin', 'text-align':'center'},
               height=70, align="center", sizing_mode="stretch_width")
 
@@ -393,6 +526,9 @@ tog_lin.on_change('active', change_var)
 
 tog_res = Toggle(label = 'Hi Res', active = False, height = 30)
 tog_res.on_change('active', change_res)
+
+rb_who_jhu = RadioButtonGroup(labels=['WHO', 'JHU'], active=0, height = 30)
+rb_who_jhu.on_change('active', change_res)
 
 rb_cases_deaths = RadioButtonGroup(labels=['Cases', 'Deaths'], active=0, height = 30)
 rb_cases_deaths.on_change('active', change_var)
@@ -416,18 +552,19 @@ plot_var = ['Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel',
 ##################################################
 df_sub = pd.read_csv('Subunits_and_small_shapes.csv', encoding='utf-8', error_bad_lines=False)
 
-df_who = get_who('110m')
 df_geo = get_geo('110m')
+df_src = get_who('110m')
+txt_src = 'WHO'
 
-first_dt = min(df_who['Date'])
-last_dt = max(df_who['Date'])
+first_dt = min(df_src['Date'])
+last_dt = max(df_src['Date'])
 prev_dt = (last_dt - timedelta(1))
 show_dt = last_dt
 
 source_map = GeoJSONDataSource(geojson = get_map(show_dt))
 
 # Sum to get world statistics
-df_all = df_who.groupby('Date').sum()
+df_all = df_src.groupby('Date').sum()
 df_all.reset_index(inplace = True)
 df_all['ToolTipDate'] = df_all.Date.map(lambda x: x.strftime("%b %d"))
 df_all['Country'] = 'World'
@@ -479,4 +616,4 @@ columns_out = [TableColumn(field='stat', title="Statistic"),
 table_out = DataTable(source=source_out, columns=columns_out, height=125, width=100, sizing_mode="stretch_width")
 
 # Make a column layout of widgets and plots
-curdoc().add_root(row(column(make_map(), row(column(heading, row(button, tog_lin, tog_res, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, table_out, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
+curdoc().add_root(row(column(make_map(), row(column(heading, row(button, tog_lin, tog_res, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_who_jhu, rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, table_out, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
