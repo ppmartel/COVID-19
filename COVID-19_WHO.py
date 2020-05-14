@@ -88,6 +88,24 @@ def get_geo(resolution):
 
     return df
 
+def get_map(date):
+    global df_map
+    # Build results map
+    df_map = df_geo.copy()
+    df_tmp = df_who[df_who['Date'] == date][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs']]
+    df_map = df_map.merge(df_tmp, left_on = 'Country', right_on = 'Country', how = 'left')
+    df_map['Cases_Tot_Rel'] = 1000*df_map['Cases_Tot_Abs']/df_map['Population']
+    df_map['Cases_New_Rel'] = 1000*df_map['Cases_New_Abs']/df_map['Population']
+    df_map['Deaths_Tot_Rel'] = 1000*df_map['Deaths_Tot_Abs']/df_map['Population']
+    df_map['Deaths_New_Rel'] = 1000*df_map['Deaths_New_Abs']/df_map['Population']
+    df_map['Selected'] = df_map[plot_var[sel_var]]
+    df_map.fillna(0, inplace = True)
+
+    #Convert to json for plotting
+    df_map_json = json.loads(df_map.to_json())
+    json_map = json.dumps(df_map_json)
+    return json_map
+
 def get_stats():
     sum_population = df_grp[df_grp['Date'] == show_dt]['Population'].sum()
     sum_cases_tot_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Abs'].sum()
@@ -131,11 +149,6 @@ custom=CustomJSHover(code="""
                      return "(1/" + scaled.toFixed(1) + suffix + " Ppl)";
                      """)
 
-hover = HoverTool(tooltips= [('Date','@ToolTipDate'),
-                             ('Country/region','@Country'), ('Population','@Population'),
-                             ('Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}')],
-                  formatters={'@Cases_Tot_Rel' : custom}, mode = 'vline')
-
 def my_format(num):
     if num == 0:
         return '0'
@@ -156,7 +169,7 @@ def make_map():
     p.ygrid.grid_line_color = None
     
     # Choose linear or logarithmic color mapper
-    if lin_map.active:
+    if tog_lin.active:
         mapper = LinearColorMapper(palette = palette, low = 0, high = plot_max[sel_var])
         color_bar = ColorBar(color_mapper = mapper, label_standoff = 8, height = 20, #width = 500, 
                              border_line_color = None, location = (0,0), orientation = 'horizontal', 
@@ -240,22 +253,7 @@ def update_map(attr, old, new):
     dt_span.update(location=slider.value_as_date)
     
     source_out.data = get_stats()
-
-    # Build results map
-    df_map = df_geo.copy()
-    df_tmp = df_who[df_who['Date'] == show_dt][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs']]
-    df_map = df_map.merge(df_tmp, left_on = 'Country', right_on = 'Country', how = 'left')
-    df_map['Cases_Tot_Rel'] = 1000*df_map['Cases_Tot_Abs']/df_map['Population']
-    df_map['Cases_New_Rel'] = 1000*df_map['Cases_New_Abs']/df_map['Population']
-    df_map['Deaths_Tot_Rel'] = 1000*df_map['Deaths_Tot_Abs']/df_map['Population']
-    df_map['Deaths_New_Rel'] = 1000*df_map['Deaths_New_Abs']/df_map['Population']
-    df_map['Selected'] = df_map[plot_var[sel_var]]
-    df_map.fillna(0, inplace = True)
-
-    #Convert to json for plotting
-    df_map_json = json.loads(df_map.to_json())
-    json_map = json.dumps(df_map_json)
-    source_map.geojson = json_map
+    source_map.geojson = get_map(show_dt)
 
 # Define the callback function: update_plot
 def update_plot(attr, old, new):
@@ -311,12 +309,10 @@ def change_var(attr, old, new):
     curdoc().clear()
     
     global sel_var
+    global source_map
+
     sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
-    
-    df_map['Selected'] = df_map[plot_var[sel_var]]
-    df_map_json = json.loads(df_map.to_json())
-    json_map = json.dumps(df_map_json)
-    source_map.geojson = json_map
+    source_map = GeoJSONDataSource(geojson = get_map(show_dt))
     
     df_grp['Selected'] = df_grp[plot_var[sel_var]]
     source_grp.data = df_grp
@@ -339,7 +335,20 @@ def change_var(attr, old, new):
                           ('Tot Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}')]
         hover.formatters = {'@Cases_Tot_Rel' : custom}
 
-    curdoc().add_root(row(column(make_map(), row(column(heading, row(button, lin_map, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, table_out, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
+    curdoc().add_root(row(column(make_map(), row(column(heading, row(button, tog_lin, tog_res, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, table_out, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
+
+def change_res(attr, old, new):
+    global df_who
+    global df_geo
+
+    if tog_res.active:
+        df_who = get_who('50m')
+        df_geo = get_geo('50m')
+    else:
+        df_who = get_who('110m')
+        df_geo = get_geo('110m')
+
+    change_var(attr, old, new)
 
 def animate_update():
     global show_dt
@@ -364,6 +373,39 @@ def animate():
 ##################################################
 # Main code
 ##################################################
+             
+# heading fills available width
+heading = Div(text='Worldwide COVID-19 Statistics - <a href="https://www.who.int/emergencies/diseases/novel-coronavirus-2019/situation-reports" target="_blank">WHO</a></br>Click on countries (multiple with shift)</br>Created by Phil Martel - <a href="https://github.com/ppmartel/COVID-19" target="_blank">GitHub Repository</a>',
+              style={'background-color':'#c8cfd6', 'outline':'black solid thin', 'text-align':'center'},
+              height=70, align="center", sizing_mode="stretch_width")
+
+# Make a toggle to cycle through the dates
+button = Button(label='► Play', height = 30)
+button.on_click(animate)
+
+# Make a toggle for changing the map to linear
+tog_lin = Toggle(label = 'Lin Map', active = False, height = 30)
+tog_lin.on_change('active', change_var)
+
+tog_res = Toggle(label = 'Hi Res', active = False, height = 30)
+tog_res.on_change('active', change_res)
+
+rb_cases_deaths = RadioButtonGroup(labels=['Cases', 'Deaths'], active=0, height = 30)
+rb_cases_deaths.on_change('active', change_var)
+
+rb_abs_rel = RadioButtonGroup(labels=['Per Region', 'Per 1k Ppl'], active=0, height = 30)
+rb_abs_rel.on_change('active', change_var)
+
+rb_tot_new = RadioButtonGroup(labels=['Total', 'New'], active=0, height = 30)
+rb_tot_new.on_change('active', change_var)
+
+sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
+
+# Make a selection of what to plot
+plot_title = ['Tot Cases', 'New Cases', 'Tot Cases/1k Ppl', 'New Cases/1k Ppl',
+              'Tot Deaths', 'New Deaths', 'Tot Deaths/1k Ppl', 'New Deaths/1k Ppl']
+plot_var = ['Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel',
+            'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel']
 
 ##################################################
 # Get subunits for countries to merge
@@ -371,29 +413,14 @@ def animate():
 df_sub = pd.read_csv('Subunits_and_small_shapes.csv', encoding='utf-8', error_bad_lines=False)
 
 df_who = get_who('110m')
+df_geo = get_geo('110m')
 
 first_dt = min(df_who['Date'])
 last_dt = max(df_who['Date'])
 prev_dt = (last_dt - timedelta(1))
 show_dt = last_dt
 
-df_geo = get_geo('110m')
-
-# Build results map
-df_map = df_geo.copy()
-df_tmp = df_who[df_who['Date'] == show_dt][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs']]
-df_map = df_map.merge(df_tmp, left_on = 'Country', right_on = 'Country', how = 'left')
-df_map['Cases_Tot_Rel'] = 1000*df_map['Cases_Tot_Abs']/df_map['Population']
-df_map['Cases_New_Rel'] = 1000*df_map['Cases_New_Abs']/df_map['Population']
-df_map['Deaths_Tot_Rel'] = 1000*df_map['Deaths_Tot_Abs']/df_map['Population']
-df_map['Deaths_New_Rel'] = 1000*df_map['Deaths_New_Abs']/df_map['Population']
-df_map['Selected'] = df_map['Cases_Tot_Abs']
-df_map.fillna(0, inplace = True)
-
-#Convert to json for plotting
-df_map_json = json.loads(df_map.to_json())
-json_map = json.dumps(df_map_json)
-source_map = GeoJSONDataSource(geojson = json_map)
+source_map = GeoJSONDataSource(geojson = get_map(show_dt))
 
 # Sum to get world statistics
 df_all = df_who.groupby('Date').sum()
@@ -417,11 +444,12 @@ palette = brewer['YlGnBu'][9]
 #Reverse color order so that dark blue is highest obesity.
 palette = palette[::-1]
 
-# Make a selection of what to plot
-plot_title = ['Tot Cases', 'New Cases', 'Tot Cases/1k Ppl', 'New Cases/1k Ppl',
-              'Tot Deaths', 'New Deaths', 'Tot Deaths/1k Ppl', 'New Deaths/1k Ppl']
-plot_var = ['Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel',
-            'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel']
+# Hover tool
+hover = HoverTool(tooltips= [('Date','@ToolTipDate'),
+                             ('Country/region','@Country'), ('Population','@Population'),
+                             ('Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}')],
+                  formatters={'@Cases_Tot_Rel' : custom}, mode = 'vline')
+
 plot_min = [1, 1, 0.0005, 0.0005, 1, 1, 0.0005, 0.00001]
 plot_max = [max(df_map[plot_var[0]]), max(df_map[plot_var[1]]), max(df_map[plot_var[2]]),
             max(df_map[plot_var[3]]), max(df_map[plot_var[4]]), max(df_map[plot_var[5]]),
@@ -454,30 +482,6 @@ tick_log = [{'1':'1', '10':'10', '100':'100', '1000':'1k', '10000':'10k', '10000
              '1':'1/1k', '10':'1/100', '100':'1/10'},
             {'0.00001':'1/100M', '0.0001':'1/10M', '0.001':'1/1M', '0.01':'1/100k', '0.1':'1/10k',
              '1':'1/1k', '10':'1/100', '100':'1/10'}]
-             
-# heading fills available width
-heading = Div(text='Worldwide COVID-19 Statistics - <a href="https://www.who.int/emergencies/diseases/novel-coronavirus-2019/situation-reports" target="_blank">WHO</a></br>Click on countries (multiple with shift)</br>Created by Phil Martel - <a href="https://github.com/ppmartel/COVID-19" target="_blank">GitHub Repository</a>',
-              style={'background-color':'#c8cfd6', 'outline':'black solid thin', 'text-align':'center'},
-              height=70, align="center", sizing_mode="stretch_width")
-
-# Make a toggle to cycle through the dates
-button = Button(label='► Play', height = 30)
-button.on_click(animate)
-
-# Make a toggle for changing the map to linear
-lin_map = Toggle(label = 'Linear Map', active = False, height = 30)
-lin_map.on_change('active', change_var)
-
-rb_cases_deaths = RadioButtonGroup(labels=['Cases', 'Deaths'], active=0, height = 30)
-rb_cases_deaths.on_change('active', change_var)
-
-rb_abs_rel = RadioButtonGroup(labels=['Per Region', 'Per 1k Ppl'], active=0, height = 30)
-rb_abs_rel.on_change('active', change_var)
-
-rb_tot_new = RadioButtonGroup(labels=['Total', 'New'], active=0, height = 30)
-rb_tot_new.on_change('active', change_var)
-
-sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
 
 # Make a selection of the date to plot
 slider = DateSlider(title = 'Date', start = first_dt, end = last_dt, step = 1, value = last_dt,
@@ -499,4 +503,4 @@ columns_out = [TableColumn(field='stat', title="Statistic"),
 table_out = DataTable(source=source_out, columns=columns_out, height=125, width=100, sizing_mode="stretch_width")
 
 # Make a column layout of widgets and plots
-curdoc().add_root(row(column(make_map(), row(column(heading, row(button, lin_map, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, table_out, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
+curdoc().add_root(row(column(make_map(), row(column(heading, row(button, tog_lin, tog_res, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, table_out, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
