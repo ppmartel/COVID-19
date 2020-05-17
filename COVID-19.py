@@ -181,22 +181,18 @@ def get_geo(resolution):
     return df
 
 def get_map(date):
-    global df_map
     # Build results map
-    df_map = df_geo.copy()
-    df_tmp = df_src[df_src['Date'] == date][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs']]
-    df_map = df_map.merge(df_tmp, left_on = 'Country', right_on = 'Country', how = 'left')
-    df_map['Cases_Tot_Rel'] = 100000*df_map['Cases_Tot_Abs']/df_map['Population']
-    df_map['Cases_New_Rel'] = 100000*df_map['Cases_New_Abs']/df_map['Population']
-    df_map['Deaths_Tot_Rel'] = 100000*df_map['Deaths_Tot_Abs']/df_map['Population']
-    df_map['Deaths_New_Rel'] = 100000*df_map['Deaths_New_Abs']/df_map['Population']
-    df_map['Selected'] = df_map[plot_var[sel_var]]
-    df_map.fillna(0, inplace = True)
+    df = df_geo.copy()
+    df = df.merge(df_src[df_src['Date'] == date][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs']],
+                  left_on = 'Country', right_on = 'Country', how = 'left')
+    df['Cases_Tot_Rel'] = 100000*df['Cases_Tot_Abs']/df['Population']
+    df['Cases_New_Rel'] = 100000*df['Cases_New_Abs']/df['Population']
+    df['Deaths_Tot_Rel'] = 100000*df['Deaths_Tot_Abs']/df['Population']
+    df['Deaths_New_Rel'] = 100000*df['Deaths_New_Abs']/df['Population']
+    df['Selected'] = df[plot_var[sel_var]]
+    df.fillna(0, inplace = True)
 
-    #Convert to json for plotting
-    df_map_json = json.loads(df_map.to_json())
-    json_map = json.dumps(df_map_json)
-    return json_map
+    return df
 
 def get_stats():
     sum_population = df_grp[df_grp['Date'] == show_dt]['Population'].sum()
@@ -341,6 +337,8 @@ def make_log():
 # Define the callback function: update_map
 def update_map(attr, old, new):
     global show_dt
+    global df_map
+    
     show_dt = pd.to_datetime(slider.value_as_date)
     if slider.value_as_datetime > first_dt:
         prev_dt = (pd.to_datetime(slider.value_as_date) - timedelta(1))
@@ -349,7 +347,12 @@ def update_map(attr, old, new):
     dt_span.update(location=slider.value_as_date)
     
     source_out.data = get_stats()
-    source_map.geojson = get_map(show_dt)
+    df_map = get_map(show_dt)
+    
+    #Convert to json for plotting
+    df_map_json = json.loads(df_map.to_json())
+    json_map = json.dumps(df_map_json)
+    source_map.geojson = json_map
 
 # Define the callback function: update_plot
 def update_plot(attr, old, new):
@@ -404,33 +407,21 @@ def update_plot(attr, old, new):
 def change_var(attr, old, new):
     curdoc().clear()
 
-    global df_all
-    global df_grp
     global sel_var
-    global source_map
-    global source_grp
+    global df_map
+    global df_grp
 
     sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
-    #old_list = source_map.selected.indices
-    source_map = GeoJSONDataSource(geojson = get_map(show_dt))
-    #source_map.selected.indices = old_list
+    df_map['Selected'] = df_map[plot_var[sel_var]]
     
-    # Sum to get world statistics
-    df_all = df_src.groupby('Date').sum()
-    df_all.reset_index(inplace = True)
-    df_all['ToolTipDate'] = df_all.Date.map(lambda x: x.strftime("%b %d"))
-    df_all['Country'] = 'World'
-    df_all['Population'] = 7776350000
-    df_all['Cases_Tot_Rel'] = df_all['Cases_Tot_Abs']/77763.50
-    df_all['Cases_New_Rel'] = df_all['Cases_New_Abs']/77763.50
-    df_all['Deaths_Tot_Rel'] = df_all['Deaths_Tot_Abs']/77763.50
-    df_all['Deaths_New_Rel'] = df_all['Deaths_New_Abs']/77763.50
-    df_all['Selected'] = df_all['Cases_Tot_Abs']
-    df_all['Color'] = Category20_16[0]
+    #Convert to json for plotting
+    df_map_json = json.loads(df_map.to_json())
+    json_map = json.dumps(df_map_json)
+    source_map.geojson = json_map
     
-    df_grp = df_all.copy()
-    #df_grp['Selected'] = df_grp[plot_var[sel_var]]
-    source_grp = ColumnDataSource(df_grp)
+    #df_grp = df_all.copy()
+    df_grp['Selected'] = df_grp[plot_var[sel_var]]
+    source_grp.data = df_grp
     source_out.data = get_stats()
 
     if rb_cases_deaths.active and rb_tot_new.active:
@@ -453,13 +444,19 @@ def change_var(attr, old, new):
 
     curdoc().add_root(row(column(make_map(), row(column(heading, row(button, tog_lin, tog_res, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_who_jhu, rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, table_out, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
 
-def change_res(attr, old, new):
+def change_src(attr, old, new):
+    curdoc().clear()
+
     global txt_src
     global df_src
     global df_geo
     global first_dt
     global last_dt
     global show_dt
+    global df_map
+    global df_all
+    global df_grp
+    global source_grp
 
     if tog_res.active:
         res = '50m'
@@ -485,7 +482,35 @@ def change_res(attr, old, new):
         show_dt = last_dt
         slider.value = show_dt
 
-    change_var(attr, old, new)
+    df_map = get_map(show_dt)
+    
+    #Convert to json for plotting
+    df_map_json = json.loads(df_map.to_json())
+    json_map = json.dumps(df_map_json)
+    #old_list = source_map.selected.indices
+    source_map.selected.update(indices = [])
+    source_map.geojson = json_map
+    #source_map.selected.indices = old_list
+    
+    # Sum to get world statistics
+    df_all = df_src.groupby('Date').sum()
+    df_all.reset_index(inplace = True)
+    df_all['ToolTipDate'] = df_all.Date.map(lambda x: x.strftime("%b %d"))
+    df_all['Country'] = 'World'
+    df_all['Population'] = 7776350000
+    df_all['Cases_Tot_Rel'] = df_all['Cases_Tot_Abs']/77763.50
+    df_all['Cases_New_Rel'] = df_all['Cases_New_Abs']/77763.50
+    df_all['Deaths_Tot_Rel'] = df_all['Deaths_Tot_Abs']/77763.50
+    df_all['Deaths_New_Rel'] = df_all['Deaths_New_Abs']/77763.50
+    df_all['Selected'] = df_all['Cases_Tot_Abs']
+    df_all['Color'] = Category20_16[0]
+    
+    df_grp = df_all.copy()
+    #df_grp['Selected'] = df_grp[plot_var[sel_var]]
+    source_grp = ColumnDataSource(df_grp)
+    source_out.data = get_stats()
+    
+    curdoc().add_root(row(column(make_map(), row(column(heading, row(button, tog_lin, tog_res, sizing_mode="stretch_width"), sizing_mode="stretch_width"), column(rb_who_jhu, rb_cases_deaths, rb_tot_new, rb_abs_rel, sizing_mode="stretch_width")), slider, table_out, sizing_mode="scale_width"), column(make_lin(), make_log(), sizing_mode="scale_width"), sizing_mode="stretch_both"))
 
 def animate_update():
     global show_dt
@@ -525,10 +550,10 @@ tog_lin = Toggle(label = 'Lin Map', active = False, height = 30)
 tog_lin.on_change('active', change_var)
 
 tog_res = Toggle(label = 'Hi Res', active = False, height = 30)
-tog_res.on_change('active', change_res)
+tog_res.on_change('active', change_src)
 
 rb_who_jhu = RadioButtonGroup(labels=['WHO', 'JHU'], active=0, height = 30)
-rb_who_jhu.on_change('active', change_res)
+rb_who_jhu.on_change('active', change_src)
 
 rb_cases_deaths = RadioButtonGroup(labels=['Cases', 'Deaths'], active=0, height = 30)
 rb_cases_deaths.on_change('active', change_var)
@@ -561,7 +586,12 @@ last_dt = max(df_src['Date'])
 prev_dt = (last_dt - timedelta(1))
 show_dt = last_dt
 
-source_map = GeoJSONDataSource(geojson = get_map(show_dt))
+df_map = get_map(show_dt)
+
+#Convert to json for plotting
+df_map_json = json.loads(df_map.to_json())
+json_map = json.dumps(df_map_json)
+source_map = GeoJSONDataSource(geojson = json_map)
 
 # Sum to get world statistics
 df_all = df_src.groupby('Date').sum()
