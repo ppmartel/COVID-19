@@ -22,7 +22,7 @@ def get_who(resolution):
     df = pd.read_csv('WHO-COVID-19-global-data.csv', encoding='utf-8', error_bad_lines=False)
 
     df.drop(df.columns[[1,3]], axis=1, inplace=True)
-    df.rename(columns = {df.columns[0]:'Date', df.columns[1]:'Country', df.columns[2]:'Deaths_New_Abs', df.columns[3]:'Deaths_Tot_Abs', df.columns[4]:'Cases_New_Abs', df.columns[5]:'Cases_Tot_Abs'}, inplace=True)
+    df.rename(columns = {df.columns[0]:'Date', df.columns[1]:'Country', df.columns[2]:'Cases_New_Abs', df.columns[3]:'Cases_Tot_Abs', df.columns[4]:'Deaths_New_Abs', df.columns[5]:'Deaths_Tot_Abs'}, inplace=True)
     df['Date'] = pd.to_datetime(df['Date'])
     df['ToolTipDate'] = df.Date.map(lambda x: x.strftime("%b %d"))
 
