@@ -55,10 +55,10 @@ def get_who(resolution):
         df['Country'] = df['Country'].str.replace(df_sub.iloc[index_this,0],df_sub.iloc[index_this,1])
     
     df = df.groupby(['Date','Country']).sum()
-    df['Cases_Avg_Abs'] = df.groupby('Country', group_keys=False).rolling('7D', on='Date').mean()['Cases_New_Abs']
-    df['Deaths_Avg_Abs'] = df.groupby('Country', group_keys=False).rolling('7D', on='Date').mean()['Deaths_New_Abs']
     df = df.sort_values(['Country', 'Date'])
     df.reset_index(inplace = True)
+    df['Cases_Avg_Abs'] = df.groupby('Country', group_keys=False).rolling('7D', on='Date').mean()['Cases_New_Abs']
+    df['Deaths_Avg_Abs'] = df.groupby('Country', group_keys=False).rolling('7D', on='Date').mean()['Deaths_New_Abs']
 
     return df
 
