@@ -55,6 +55,8 @@ def get_who(resolution):
         df['Country'] = df['Country'].str.replace(df_sub.iloc[index_this,0],df_sub.iloc[index_this,1])
     
     df = df.groupby(['Date','Country']).sum()
+    df['Cases_Avg_Abs'] = df.groupby('Country', group_keys=False).rolling('7D', on='Date').mean()['Cases_New_Abs']
+    df['Deaths_Avg_Abs'] = df.groupby('Country', group_keys=False).rolling('7D', on='Date').mean()['Deaths_New_Abs']
     df = df.sort_values(['Country', 'Date'])
     df.reset_index(inplace = True)
 
@@ -135,8 +137,10 @@ def get_jhu(resolution):
 
     df = df_cases_tot[['Date', 'Country', 'Cases_Tot_Abs']].copy()
     df['Cases_New_Abs'] = df_cases_new['Cases_New_Abs']
+    df['Cases_Avg_Abs'] = df.groupby('Country', group_keys=False).rolling('7D', on='Date').mean()['Cases_New_Abs']
     df['Deaths_Tot_Abs'] = df_deaths_tot['Deaths_Tot_Abs']
     df['Deaths_New_Abs'] = df_deaths_new['Deaths_New_Abs']
+    df['Deaths_Avg_Abs'] = df.groupby('Country', group_keys=False).rolling('7D', on='Date').mean()['Deaths_New_Abs']
     df['ToolTipDate'] = df.Date.map(lambda x: x.strftime("%b %d"))
     df = df.sort_values(['Country', 'Date'])
     df.reset_index(inplace = True)
@@ -183,12 +187,14 @@ def get_geo(resolution):
 def get_map(date):
     # Build results map
     df = df_geo.copy()
-    df = df.merge(df_src[df_src['Date'] == date][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs']],
+    df = df.merge(df_src[df_src['Date'] == date][['Country', 'Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Avg_Abs', 'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Avg_Abs']],
                   left_on = 'Country', right_on = 'Country', how = 'left')
     df['Cases_Tot_Rel'] = 100000*df['Cases_Tot_Abs']/df['Population']
     df['Cases_New_Rel'] = 100000*df['Cases_New_Abs']/df['Population']
+    df['Cases_Avg_Rel'] = 100000*df['Cases_Avg_Abs']/df['Population']
     df['Deaths_Tot_Rel'] = 100000*df['Deaths_Tot_Abs']/df['Population']
     df['Deaths_New_Rel'] = 100000*df['Deaths_New_Abs']/df['Population']
+    df['Deaths_Avg_Rel'] = 100000*df['Deaths_Avg_Abs']/df['Population']
     df['Selected'] = df[plot_var[sel_var]]
     df.fillna(0, inplace = True)
 
@@ -198,17 +204,21 @@ def get_stats():
     sum_population = df_grp[df_grp['Date'] == show_dt]['Population'].sum()
     sum_cases_tot_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Tot_Abs'].sum()
     sum_cases_new_abs = df_grp[df_grp['Date'] == show_dt]['Cases_New_Abs'].sum()
+    sum_cases_avg_abs = df_grp[df_grp['Date'] == show_dt]['Cases_Avg_Abs'].sum()
     sum_cases_tot_rel = 100000*sum_cases_tot_abs/sum_population
     sum_cases_new_rel = 100000*sum_cases_new_abs/sum_population
+    sum_cases_avg_rel = 100000*sum_cases_avg_abs/sum_population
     sum_deaths_tot_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_Tot_Abs'].sum()
     sum_deaths_new_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_New_Abs'].sum()
+    sum_deaths_avg_abs = df_grp[df_grp['Date'] == show_dt]['Deaths_Avg_Abs'].sum()
     sum_deaths_tot_rel = 100000*sum_deaths_tot_abs/sum_population
     sum_deaths_new_rel = 100000*sum_deaths_new_abs/sum_population
+    sum_deaths_avg_rel = 100000*sum_deaths_avg_abs/sum_population
 
-    my_stats = dict(stat=['Tot Cases', 'New Cases', 'Tot Deaths', 'New Deaths'],
-                    vabs=[sum_cases_tot_abs, sum_cases_new_abs, sum_deaths_tot_abs, sum_deaths_new_abs],
-                    vrel=[my_format(sum_cases_tot_rel), my_format(sum_cases_new_rel),
-                          my_format(sum_deaths_tot_rel), my_format(sum_deaths_new_rel)])
+    my_stats = dict(stat=['Tot Cases', 'New Cases', 'Avg Cases', 'Tot Deaths', 'New Deaths', 'Avg Deaths'],
+                    vabs=[sum_cases_tot_abs, sum_cases_new_abs, sum_cases_avg_abs, sum_deaths_tot_abs, sum_deaths_new_abs, sum_deaths_avg_abs],
+                    vrel=[my_format(sum_cases_tot_rel), my_format(sum_cases_new_rel), my_format(sum_cases_avg_rel),
+                          my_format(sum_deaths_tot_rel), my_format(sum_deaths_new_rel), my_format(sum_deaths_avg_rel)])
     return my_stats
 
 
@@ -283,10 +293,12 @@ def make_map():
     p.add_tools(HoverTool(tooltips = [('Country/region','@Country'), ('Population','@Population'), 
                                       ('Tot Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}'),
                                       ('New Cases','@Cases_New_Abs @Cases_New_Rel{custom}'),
+                                      ('Avg Cases','@Cases_Avg_Abs @Cases_Avg_Rel{custom}'),
                                       ('Tot Deaths','@Deaths_Tot_Abs @Deaths_Tot_Rel{custom}'),
-                                      ('New Deaths','@Deaths_New_Abs @Deaths_New_Rel{custom}')],
-                          formatters={'@Cases_Tot_Rel' : custom, '@Cases_New_Rel' : custom,
-                                      '@Deaths_Tot_Rel' : custom, '@Deaths_New_Rel' : custom}))
+                                      ('New Deaths','@Deaths_New_Abs @Deaths_New_Rel{custom}'),
+                                      ('Avg Deaths','@Deaths_Avg_Abs @Deaths_Avg_Rel{custom}')],
+                          formatters={'@Cases_Tot_Rel' : custom, '@Cases_New_Rel' : custom, '@Cases_Avg_Rel' : custom,
+                                      '@Deaths_Tot_Rel' : custom, '@Deaths_New_Rel' : custom, '@Deaths_Avg_Rel' : custom}))
     return p
 
 # Make linear plot
@@ -372,8 +384,10 @@ def update_plot(attr, old, new):
             return
         
         df_grp = pd.DataFrame(columns=['Date', 'ToolTipDate', 'Country', 'Population', 'Selected', 'Color',
-                                       'Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel',
-                                       'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel'])
+                                       'Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Avg_Abs',
+                                       'Cases_Tot_Rel', 'Cases_New_Rel', 'Cases_Avg_Rel',
+                                       'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Avg_Abs',
+                                       'Deaths_Tot_Rel', 'Deaths_New_Rel', 'Deaths_Avg_Rel'])
 
         color_index = 0
         prev_country = 'World'
@@ -387,8 +401,10 @@ def update_plot(attr, old, new):
                 df_sel['Population'] = pop_country
                 df_sel['Cases_Tot_Rel'] = 100000*df_sel['Cases_Tot_Abs']/pop_country
                 df_sel['Cases_New_Rel'] = 100000*df_sel['Cases_New_Abs']/pop_country
+                df_sel['Cases_Avg_Rel'] = 100000*df_sel['Cases_Avg_Abs']/pop_country
                 df_sel['Deaths_Tot_Rel'] = 100000*df_sel['Deaths_Tot_Abs']/pop_country
                 df_sel['Deaths_New_Rel'] = 100000*df_sel['Deaths_New_Abs']/pop_country
+                df_sel['Deaths_Avg_Rel'] = 100000*df_sel['Deaths_Avg_Abs']/pop_country
                 df_sel['Selected'] = df_sel[plot_var[sel_var]]
                 df_sel['Color'] = Category20_16[color_index]
                 color_index = color_index + 1
@@ -411,7 +427,8 @@ def change_var(attr, old, new):
     global df_map
     global df_grp
 
-    sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
+    #sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
+    sel_var = 6 * rb_cases_deaths.active + 3 * rb_abs_rel.active + rb_tot_new.active
     df_map['Selected'] = df_map[plot_var[sel_var]]
     
     #Convert to json for plotting
@@ -500,8 +517,10 @@ def change_src(attr, old, new):
     df_all['Population'] = 7776350000
     df_all['Cases_Tot_Rel'] = df_all['Cases_Tot_Abs']/77763.50
     df_all['Cases_New_Rel'] = df_all['Cases_New_Abs']/77763.50
+    df_all['Cases_Avg_Rel'] = df_all['Cases_Avg_Abs']/77763.50
     df_all['Deaths_Tot_Rel'] = df_all['Deaths_Tot_Abs']/77763.50
     df_all['Deaths_New_Rel'] = df_all['Deaths_New_Abs']/77763.50
+    df_all['Deaths_Avg_Rel'] = df_all['Deaths_Avg_Abs']/77763.50
     df_all['Selected'] = df_all['Cases_Tot_Abs']
     df_all['Color'] = Category20_16[0]
     
@@ -561,16 +580,17 @@ rb_cases_deaths.on_change('active', change_var)
 rb_abs_rel = RadioButtonGroup(labels=['Per Region', 'Per 100k'], active=0, height = 30)
 rb_abs_rel.on_change('active', change_var)
 
-rb_tot_new = RadioButtonGroup(labels=['Total', 'New'], active=0, height = 30)
+rb_tot_new = RadioButtonGroup(labels=['Total', 'New', 'Avg'], active=0, height = 30)
 rb_tot_new.on_change('active', change_var)
 
-sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
+#sel_var = int(str(rb_cases_deaths.active)+str(rb_abs_rel.active)+str(rb_tot_new.active), 2)
+sel_var = 6 * rb_cases_deaths.active + 3 * rb_abs_rel.active + rb_tot_new.active
 
 # Make a selection of what to plot
-plot_title = ['Tot Cases', 'New Cases', 'Tot Cases/100k Ppl', 'New Cases/100k Ppl',
-              'Tot Deaths', 'New Deaths', 'Tot Deaths/100k Ppl', 'New Deaths/100k Ppl']
-plot_var = ['Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel',
-            'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel']
+plot_title = ['Tot Cases', 'New Cases', 'Avg Cases', 'Tot Cases/100k Ppl', 'New Cases/100k Ppl', 'Avg Cases/100k Ppl',
+              'Tot Deaths', 'New Deaths', 'Avg Deaths', 'Tot Deaths/100k Ppl', 'New Deaths/100k Ppl', 'Avg Deaths/100k Ppl']
+plot_var = ['Cases_Tot_Abs', 'Cases_New_Abs', 'Cases_Avg_Abs', 'Cases_Tot_Rel', 'Cases_New_Rel', 'Cases_Avg_Rel',
+            'Deaths_Tot_Abs', 'Deaths_New_Abs', 'Deaths_Avg_Abs', 'Deaths_Tot_Rel', 'Deaths_New_Rel', 'Deaths_Avg_Rel']
 
 ##################################################
 # Get subunits for countries to merge
@@ -601,8 +621,10 @@ df_all['Country'] = 'World'
 df_all['Population'] = 7776350000
 df_all['Cases_Tot_Rel'] = df_all['Cases_Tot_Abs']/77763.50
 df_all['Cases_New_Rel'] = df_all['Cases_New_Abs']/77763.50
+df_all['Cases_Avg_Rel'] = df_all['Cases_Avg_Abs']/77763.50
 df_all['Deaths_Tot_Rel'] = df_all['Deaths_Tot_Abs']/77763.50
 df_all['Deaths_New_Rel'] = df_all['Deaths_New_Abs']/77763.50
+df_all['Deaths_Avg_Rel'] = df_all['Deaths_Avg_Abs']/77763.50
 df_all['Selected'] = df_all['Cases_Tot_Abs']
 df_all['Color'] = Category20_16[0]
 
@@ -621,10 +643,11 @@ hover = HoverTool(tooltips= [('Date','@ToolTipDate'),
                              ('Cases','@Cases_Tot_Abs @Cases_Tot_Rel{custom}')],
                   formatters={'@Cases_Tot_Rel' : custom}, mode = 'vline')
 
-plot_min = [1, 1, 0.0005, 0.0005, 1, 1, 0.0005, 0.00001]
+plot_min = [1, 1, 1, 0.0005, 0.0005, 0.0005, 1, 1, 1, 0.0005, 0.00001, 0.00001]
 plot_max = [max(df_map[plot_var[0]]), max(df_map[plot_var[1]]), max(df_map[plot_var[2]]),
             max(df_map[plot_var[3]]), max(df_map[plot_var[4]]), max(df_map[plot_var[5]]),
-            max(df_map[plot_var[6]]), max(df_map[plot_var[7]])]
+            max(df_map[plot_var[6]]), max(df_map[plot_var[7]]), max(df_map[plot_var[8]]),
+            max(df_map[plot_var[9]]), max(df_map[plot_var[10]]), max(df_map[plot_var[11]])]
 
 # Make a selection of the date to plot
 slider = DateSlider(title = 'Date', start = first_dt, end = last_dt, step = 1, value = last_dt,
