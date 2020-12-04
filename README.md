@@ -19,8 +19,8 @@ First, obviously get python running with the above libraries. Second, go into th
 
 with the 'Download Map Data' button in the bottom right of the map. This file should be named WHO-COVID-19-global-data.csv (rename it if not). The recent code can also use the data from Johns Hopkins, which it pulls directly from their github. Also download, and unzip into this directory, the 110m and 50m shape files from natural earth:
 
-* https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/110m/cultural/ne_110m_admin_0_countries.zip
-* https://www.naturalearthdata.com/http//www.naturalearthdata.com/download/110m/cultural/ne_50m_admin_0_countries.zip
+* https://www.naturalearthdata.com/download/110m/cultural/ne_110m_admin_0_countries.zip
+* https://www.naturalearthdata.com/download/110m/cultural/ne_50m_admin_0_countries.zip
 
 Finally run:
 
